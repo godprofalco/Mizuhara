@@ -5,52 +5,38 @@ const {
 } = require('discord.js');
 const ServerStatus = require('../../models/ServerStatus');
 
+const OWNER_ID = '969181284784025670';
+
 module.exports = {
   data: new SlashCommandBuilder()
     .setName('addserverstatus')
     .setDescription('Add a Minecraft server to track its status.')
-    .addStringOption((option) =>
-      option
-        .setName('servername')
-        .setDescription('The name of the server.')
-        .setRequired(true)
-    )
-    .addStringOption((option) =>
-      option
-        .setName('serverip')
-        .setDescription('The IP address of the server.')
-        .setRequired(true)
-    )
-    .addStringOption((option) =>
-      option
-        .setName('gamemode')
-        .setDescription('The game mode of the server (Java or Bedrock).')
+    .addStringOption(o => o.setName('servername').setDescription('Server name').setRequired(true))
+    .addStringOption(o => o.setName('serverip').setDescription('Server IP').setRequired(true))
+    .addStringOption(o =>
+      o.setName('gamemode')
+        .setDescription('Java or Bedrock')
         .setRequired(true)
         .addChoices(
           { name: 'Java', value: 'java' },
           { name: 'Bedrock', value: 'bedrock' }
         )
     )
-    .addChannelOption((option) =>
-      option
-        .setName('channel')
-        .setDescription('The channel where the server status will be posted.')
+    .addChannelOption(o =>
+      o.setName('channel')
+        .setDescription('Channel for updates')
         .addChannelTypes(ChannelType.GuildText)
         .setRequired(true)
     )
-    .addBooleanOption((option) =>
-      option
-        .setName('hideip')
-        .setDescription('Hide the real IP in status embeds')
+    .addBooleanOption(o =>
+      o.setName('hideip')
+        .setDescription('Hide real IP')
         .setRequired(false)
     ),
 
   async execute(interaction) {
-    if (!interaction.member.permissions.has('ManageGuild')) {
-      return interaction.reply({
-        content: 'You do not have `ManageGuild` permission to add server status!',
-        ephemeral: true,
-      });
+    if (interaction.user.id !== OWNER_ID) {
+      return interaction.reply({ content: '❌ Owner only.', ephemeral: true });
     }
 
     const serverName = interaction.options.getString('servername');
@@ -59,27 +45,40 @@ module.exports = {
     const channel = interaction.options.getChannel('channel');
     const hideIp = interaction.options.getBoolean('hideip') || false;
 
-    const guildId = interaction.guild.id;
-    const channelId = channel.id;
-
-    const existingEntry = await ServerStatus.findOne({
-      guildId,
+    const exists = await ServerStatus.findOne({
+      guildId: interaction.guild.id,
       serverIp,
-      channelId,
+      channelId: channel.id,
     });
 
-    if (existingEntry) {
-      return interaction.reply({
-        content: 'This server is already being tracked in the specified channel!',
-        ephemeral: true,
-      });
+    if (exists) {
+      return interaction.reply({ content: 'Already exists.', ephemeral: true });
     }
 
-    const newServerStatus = new ServerStatus({
-      guildId,
-      channelId,
+    await ServerStatus.create({
+      guildId: interaction.guild.id,
+      channelId: channel.id,
       serverName,
       serverIp,
+      gameMode,
+      hideIp,
+    });
+
+    return interaction.reply({
+      embeds: [
+        new EmbedBuilder()
+          .setColor('#00FF7F')
+          .setTitle('✅ Added')
+          .setDescription(`**${serverName}** (\`${serverIp}\`)`)
+          .addFields({
+            name: 'IP Visibility',
+            value: hideIp ? 'Hidden 🔒' : 'Visible 🌐',
+          }),
+      ],
+      ephemeral: true,
+    });
+  },
+};      serverIp,
       gameMode,
       hideIp, // ✅ SAVED HERE
     });
