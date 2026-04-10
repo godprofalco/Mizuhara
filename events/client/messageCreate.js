@@ -1,8 +1,4 @@
-const { Events } = require('discord.js');
-const AiSettings = require('../models/AiSettings');
-const { GoogleGenerativeAI } = require('@google/generative-ai');
-
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+const { Events, EmbedBuilder } = require('discord.js');
 
 module.exports = {
   name: Events.MessageCreate,
@@ -14,64 +10,42 @@ module.exports = {
 
     const client = message.client;
 
-    // 🔥 Mention check
+    // 🔥 Check mention
     const isMentioned = message.mentions.has(client.user);
-
-    // 🔥 Reply-to-bot check (safe + optimized)
-    let isReplyToBot = false;
-
-    if (message.reference?.messageId) {
-      try {
-        const repliedMsg = await message.channel.messages.fetch(message.reference.messageId);
-        isReplyToBot = repliedMsg.author.id === client.user.id;
-      } catch {
-        isReplyToBot = false;
-      }
-    }
-
-    // ❌ ignore if not triggered
-    if (!isMentioned && !isReplyToBot) return;
-
-    const data = await AiSettings.findOne({
-      guildId: message.guild.id
-    });
-
-    if (!data) {
-      return message.reply("👋 AI not setup yet. Ask owner to configure me.");
-    }
-
-    // ✅ clean user message (safe version)
-    const userMessage = message.content
-      .replace(new RegExp(`<@!?${client.user.id}>`, 'g'), '')
-      .trim();
+    if (!isMentioned) return;
 
     try {
-      const model = genAI.getGenerativeModel({ model: "gemini-pro" });
+      let helpCommandId = 'unknown';
 
-      const prompt = `
-You are an AI Discord bot.
+      // ⚠️ safer fetch (only if API ready)
+      if (client.application?.commands) {
+        const commands = await client.application.commands.fetch();
+        const helpCommand = commands.find(cmd => cmd.name === 'help');
+        if (helpCommand) helpCommandId = helpCommand.id;
+      }
 
-Personality:
-${data.behavior}
+      const userMessage = message.content
+        .replace(new RegExp(`<@!?${client.user.id}>`, 'g'), '')
+        .trim();
 
-User: ${message.author.username}
-Message: ${userMessage || "They replied to you."}
+      const mentionEmbed = new EmbedBuilder()
+        .setColor(0x5865f2)
+        .setDescription(
+          `👋 Hey ${message.author}, I'm Mizuhara, I use \`/\` commands.\n\n` +
+          `💡 You said: **${userMessage || "hello"}**\n\n` +
+          `📌 Type </help:${helpCommandId}> to see commands.\n` +
+          `⭐ Mention @godpro_falco for details.`
+        )
+        .setTimestamp();
 
-Reply naturally in a short Discord-friendly way.
-AI:
-`;
+      return message.reply({ embeds: [mentionEmbed] });
 
-      const result = await model.generateContent(prompt);
-      const response = await result.response;
-      const text = response.text();
+    } catch (error) {
+      console.error('Mention handler error:', error);
 
       return message.reply({
-        content: text.length > 2000 ? text.slice(0, 1990) + "..." : text
+        content: `👋 Hey ${message.author}, I'm online! Use /help.`
       });
-
-    } catch (err) {
-      console.error(err);
-      return message.reply("⚠️ AI error occurred.");
     }
   },
 };
