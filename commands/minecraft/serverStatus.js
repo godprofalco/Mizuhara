@@ -1,143 +1,94 @@
 const axios = require('axios');
 const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
-const ServerStatus = require('../../models/ServerStatus');
-
-const OWNER_ID = '969181284784025670';
 
 module.exports = {
   data: new SlashCommandBuilder()
     .setName('serverstatus')
-    .setDescription('Check Minecraft server status')
-    .addStringOption(o => o.setName('serverip').setDescription('Server IP').setRequired(false))
-    .addStringOption(o =>
-      o.setName('gamemode')
+    .setDescription('Get Minecraft server status')
+    .addStringOption(option =>
+      option
+        .setName('serverip')
+        .setDescription('Server IP')
+        .setRequired(true)
+    )
+    .addStringOption(option =>
+      option
+        .setName('gamemode')
         .setDescription('Java or Bedrock')
-        .setRequired(false)
+        .setRequired(true)
         .addChoices(
           { name: 'Java', value: 'java' },
           { name: 'Bedrock', value: 'bedrock' }
         )
-    )
-    .addBooleanOption(o =>
-      o.setName('hideip')
-        .setDescription('Hide IP (manual mode)')
-        .setRequired(false)
-    ),
-
-const axios = require('axios');
-const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
-const ServerStatus = require('../../models/ServerStatus');
-
-const OWNER_ID = '969181284784025670';
-
-module.exports = {
-  data: new SlashCommandBuilder()
-    .setName('serverstatus')
-    .setDescription('Check Minecraft server status')
-    .addStringOption(o => o.setName('serverip').setDescription('Server IP').setRequired(false))
-    .addStringOption(o =>
-      o.setName('gamemode')
-        .setDescription('Java or Bedrock')
-        .setRequired(false)
-        .addChoices(
-          { name: 'Java', value: 'java' },
-          { name: 'Bedrock', value: 'bedrock' }
-        )
-    )
-    .addBooleanOption(o =>
-      o.setName('hideip')
-        .setDescription('Hide IP (manual mode)')
-        .setRequired(false)
     ),
 
   async execute(interaction) {
-    if (interaction.user.id !== OWNER_ID) {
-      return interaction.reply({ content: '❌ Owner only.', ephemeral: true });
-    }
+    const serverIp = interaction.options.getString('serverip');
+    const gameMode = interaction.options.getString('gamemode');
 
-    const inputIp = interaction.options.getString('serverip');
-    const inputMode = interaction.options.getString('gamemode');
-    const inputHide = interaction.options.getBoolean('hideip') || false;
+    const apiUrl =
+      gameMode === 'java'
+        ? `https://api.mcsrvstat.us/1/${serverIp}`
+        : `https://api.mcsrvstat.us/bedrock/1/${serverIp}`;
 
-    let servers = [];
+    try {
+      const { data } = await axios.get(apiUrl);
 
-    if (inputIp && inputMode) {
-      servers.push({
-        serverName: inputIp,
-        serverIp: inputIp,
-        gameMode: inputMode,
-        hideIp: inputHide,
-      });
-    } else {
-      const dbServers = await ServerStatus.find({
-        guildId: interaction.guild.id,
-      });
-
-      if (!dbServers.length) {
+      if (data.offline) {
         return interaction.reply({
-          content: 'No servers set.',
+          embeds: [
+            new EmbedBuilder()
+              .setColor('Red')
+              .setTitle('❌ Server Offline')
+              .setDescription(`\`${serverIp}\` is offline`)
+          ],
           ephemeral: true,
         });
       }
 
-      servers = dbServers;
+      // 🔥 TPS (only if available)
+      const tps = data.tps || 'N/A';
+
+      // 🔥 PING (approx based on response time)
+      const pingStart = Date.now();
+      await axios.get(apiUrl);
+      const ping = Date.now() - pingStart;
+
+      const embed = new EmbedBuilder()
+        .setColor('Green')
+        .setTitle(`🟢 ${serverIp}`)
+        .addFields(
+          {
+            name: 'Players',
+            value: `${data.players?.online || 0}/${data.players?.max || 0}`,
+            inline: true,
+          },
+          {
+            name: 'Version',
+            value: data.version || 'Unknown',
+            inline: true,
+          },
+          {
+            name: 'Ping',
+            value: `${ping}ms`,
+            inline: true,
+          },
+          {
+            name: 'TPS',
+            value: `${tps}`,
+            inline: true,
+          }
+        )
+        .setThumbnail(`https://api.mcstatus.io/v2/icon/${serverIp}`);
+
+      return interaction.reply({ embeds: [embed] });
+
+    } catch (err) {
+      console.error(err);
+      return interaction.reply({
+        content: 'Error fetching server status.',
+        ephemeral: true,
+      });
     }
-
-    await interaction.deferReply();
-
-    const embeds = [];
-
-    for (const server of servers) {
-      const api =
-        server.gameMode === 'java'
-          ? `https://api.mcsrvstat.us/1/${server.serverIp}`
-          : `https://api.mcsrvstat.us/bedrock/1/${server.serverIp}`;
-
-      try {
-        const { data } = await axios.get(api);
-
-        const ip = server.hideIp ? '🔒 Hidden' : `\`${server.serverIp}\``;
-
-        if (data.offline) {
-          embeds.push(
-            new EmbedBuilder()
-              .setColor('#FF0000')
-              .setTitle(`❌ ${server.serverName}`)
-              .setDescription('Offline')
-              .addFields({ name: 'IP', value: ip })
-          );
-          continue;
-        }
-
-        embeds.push(
-          new EmbedBuilder()
-            .setColor('#00FF7F')
-            .setTitle(`🟢 ${server.serverName}`)
-            .addFields(
-              { name: 'IP', value: ip, inline: true },
-              {
-                name: 'Players',
-                value: `${data.players?.online || 0}/${data.players?.max || 0}`,
-                inline: true,
-              },
-              {
-                name: 'Version',
-                value: data.version || 'Unknown',
-                inline: true,
-              }
-            )
-            .setThumbnail(`https://api.mcstatus.io/v2/icon/${server.serverIp}`)
-        );
-      } catch {
-        embeds.push(
-          new EmbedBuilder()
-            .setColor('#808080')
-            .setTitle(`⚠️ ${server.serverName}`)
-            .setDescription('Error fetching data')
-        );
-      }
-    }
-
-    return interaction.editReply({ embeds });
   },
 };
