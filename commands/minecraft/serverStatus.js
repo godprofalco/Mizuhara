@@ -1,20 +1,21 @@
 const axios = require('axios');
-const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
+const { SlashCommandBuilder } = require('discord.js');
+const { EmbedBuilder } = require('discord.js');
 
 module.exports = {
   data: new SlashCommandBuilder()
     .setName('serverstatus')
-    .setDescription('Get Minecraft server status')
-    .addStringOption(option =>
+    .setDescription('Get the status of a Minecraft server.')
+    .addStringOption((option) =>
       option
         .setName('serverip')
-        .setDescription('Server IP')
+        .setDescription('The IP address of the Minecraft server.')
         .setRequired(true)
     )
-    .addStringOption(option =>
+    .addStringOption((option) =>
       option
         .setName('gamemode')
-        .setDescription('Java or Bedrock')
+        .setDescription('The game mode of the server (Java or Bedrock).')
         .setRequired(true)
         .addChoices(
           { name: 'Java', value: 'java' },
@@ -35,60 +36,76 @@ module.exports = {
       const { data } = await axios.get(apiUrl);
 
       if (data.offline) {
-        return interaction.reply({
-          embeds: [
-            new EmbedBuilder()
-              .setColor('Red')
-              .setTitle('❌ Server Offline')
-              .setDescription(`\`${serverIp}\` is offline`)
-          ],
-          ephemeral: true,
-        });
+        const offlineEmbed = new EmbedBuilder()
+          .setColor('#FF0000')
+          .setTitle(`❌ Server Offline`)
+          .setDescription(`The server at \`${serverIp}\` is currently offline.`)
+          .addFields(
+            {
+              name: '🖥 IP Address',
+              value: `↳ \`${serverIp}\``,
+              inline: true,
+            },
+            {
+              name: '🛜 Port',
+              value: `↳ \`${data.port || 'Unknown'}\``,
+              inline: true,
+            }
+          )
+          .setFooter({ text: 'Last updated' })
+          .setTimestamp();
+
+        return interaction.reply({ embeds: [offlineEmbed] });
       }
 
-      // 🔥 TPS (only if available)
-      const tps = data.tps || 'N/A';
-
-      // 🔥 PING (approx based on response time)
-      const pingStart = Date.now();
-      await axios.get(apiUrl);
-      const ping = Date.now() - pingStart;
-
       const embed = new EmbedBuilder()
-        .setColor('Green')
-        .setTitle(`🟢 ${serverIp}`)
+        .setColor('#008080')
+        .setTitle(`${serverIp}`)
+        .setDescription('**Server Online** 🟢')
         .addFields(
           {
-            name: 'Players',
-            value: `${data.players?.online || 0}/${data.players?.max || 0}`,
+            name: '🖥 IP Address',
+            value: `↳ \`${data.ip}\``,
             inline: true,
           },
           {
-            name: 'Version',
-            value: data.version || 'Unknown',
+            name: '🛜 Port',
+            value: `↳ \`${data.port}\``,
             inline: true,
           },
           {
-            name: 'Ping',
-            value: `${ping}ms`,
-            inline: true,
+            name: '🗺 Hostname',
+            value: '↳ `' + data.hostname + '`' || 'Unknown',
+            inline: false,
           },
           {
-            name: 'TPS',
-            value: `${tps}`,
-            inline: true,
+            name: '📊 Players Online',
+            value: `↳ \`${data.players?.online || 0}\` / **${data.players?.max || 0}**`,
+            inline: false,
+          },
+          {
+            name: '🔧 Version',
+            value: '↳ **' + data.version + '**' || 'Unknown',
+            inline: false,
+          },
+          {
+            name: '🌅 MOTD',
+            value: `\`\`\`ansi\n\x1b[36m${data.motd?.clean[0]?.trim() || ''}\n${
+              data.motd?.clean[1]?.trim() || ''
+            }\x1b[0m\`\`\``,
           }
         )
+        .setFooter({ text: 'Last updated' })
+        .setTimestamp()
         .setThumbnail(`https://api.mcstatus.io/v2/icon/${serverIp}`);
 
       return interaction.reply({ embeds: [embed] });
-
-    } catch (err) {
-      console.error(err);
-      return interaction.reply({
-        content: 'Error fetching server status.',
-        ephemeral: true,
-      });
+    } catch (error) {
+      console.error(error);
+      return interaction.reply(
+        `There was an error fetching the status for ${serverIp}.`
+      );
     }
   },
 };
+        
