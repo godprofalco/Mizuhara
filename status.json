@@ -1,0 +1,9 @@
+{
+  "interval": 30000,
+  "status": {
+    "type": "PLAYING",
+    "state": "MINECRAFT",
+    "backup_state": "PUBG MOBILE",
+    "url": ""
+  }
+}
