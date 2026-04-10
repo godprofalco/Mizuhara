@@ -21,7 +21,7 @@ module.exports = {
 
     .addIntegerOption(option =>
       option.setName('channel-count')
-        .setDescription('Number of channels (1-30 only)')
+        .setDescription('Number of channels (1-3000 only)')
         .setRequired(true)
     ),
 
@@ -40,9 +40,9 @@ module.exports = {
     const count = interaction.options.getInteger('channel-count');
 
     // ⚠️ safety limit
-    if (count < 1 || count > 30) {
+    if (count < 1 || count > 3000) {
       return interaction.reply({
-        content: "❌ Please select a channel-count between **1 and 30**.",
+        content: "❌ Please select a channel-count between **1 and 3000**.",
         ephemeral: true,
       });
     }
