@@ -21,40 +21,45 @@ module.exports = {
   async execute(interaction) {
     if (!interaction.member.permissions.has('ManageGuild')) {
       return interaction.reply({
-        content:
-          'You do not have `ManageGuild` permission to remove server status!',
+        content: 'You do not have `ManageGuild` permission!',
         ephemeral: true,
       });
     }
+
     const serverName = interaction.options.getString('servername');
     const serverIp = interaction.options.getString('serverip');
 
+    const guildId = interaction.guild.id;
+
+    // 🔥 SAFE DELETE (guild specific)
     const server = await ServerStatus.findOneAndDelete({
+      guildId,
       serverName,
       serverIp,
     });
 
     if (!server) {
       return interaction.reply({
-        content: `No server found with the name **${serverName}** and IP **${serverIp}**.`,
+        content: `❌ No server found with **${serverName}** (\`${serverIp}\`) in this server.`,
         ephemeral: true,
       });
     }
 
-    if (server.messageId) {
+    // 🔥 DELETE MESSAGE IF EXISTS
+    if (server.messageId && server.channelId) {
       try {
-        const channel = await interaction.guild.channels.fetch(
-          server.channelId
-        );
-        const message = await channel.messages.fetch(server.messageId);
-        await message.delete();
+        const channel = await interaction.guild.channels.fetch(server.channelId);
+        if (channel) {
+          const message = await channel.messages.fetch(server.messageId);
+          if (message) await message.delete();
+        }
       } catch (error) {
-        console.error('Error deleting message:', error);
+        console.log('⚠️ Could not delete status message:', error.message);
       }
     }
 
     return interaction.reply({
-      content: `Successfully removed server status tracking for **${serverName}** (\`${serverIp}\`).`,
+      content: `✅ Removed **${serverName}** (\`${serverIp}\`) from tracking.`,
       ephemeral: true,
     });
   },
