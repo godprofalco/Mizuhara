@@ -65,7 +65,7 @@ module.exports = {
         .addFields(
           {
             name: '🖥 IP Address',
-            value: `↳ \`${data.ip}\``,
+            value: `↳ \`' + data.hostname + '`' || 'Unknown'``,
             inline: true,
           },
           {
