@@ -8,15 +8,13 @@ app.get('/', (req, res) => {
 app.listen(10000, () => {
   console.log('✅ Express server running on http://localhost:10000');
 });
-
 require('dotenv').config();
 const { Client, GatewayIntentBits } = require('discord.js');
 const { LavalinkManager } = require('lavalink-client');
 const fs = require('fs');
 const path = require('path');
 const chalk = require('chalk');
-
-const deployCommands = require('./deployCommands'); // 🔥 ADDED
+const { autoPlayFunction } = require('./functions/autoPlay');
 
 const client = new Client({
   intents: [
@@ -29,24 +27,58 @@ const client = new Client({
   ],
 });
 
-client.once('ready', async () => {
-  console.log(chalk.green(`Logged in as ${client.user.tag}`));
-
-  // 🔥 THIS FIXES hideip NOT SHOWING
-  await deployCommands(client);
+client.lavalink = new LavalinkManager({
+  nodes: [
+    {
+      authorization: process.env.LL_PASSWORD,
+      host: process.env.LL_HOST,
+      port: parseInt(process.env.LL_PORT, 10),
+      id: process.env.LL_NAME,
+    },
+  ],
+  sendToShard: (guildId, payload) =>
+    client.guilds.cache.get(guildId)?.shard?.send(payload),
+  autoSkip: true,
+  client: {
+    id: process.env.DISCORD_CLIENT_ID,
+    username: 'Mizuhara',
+  },
+  playerOptions: {
+    onEmptyQueue: {
+      destroyAfterMs: 30_000,
+      autoPlayFunction: autoPlayFunction,
+    },
+  },
 });
 
-// (your Lavalink + handlers stay EXACTLY same)
+const styles = {
+  successColor: chalk.bold.green,
+  warningColor: chalk.bold.yellow,
+  infoColor: chalk.bold.blue,
+  commandColor: chalk.bold.cyan,
+  userColor: chalk.bold.magenta,
+  errorColor: chalk.red,
+  highlightColor: chalk.bold.hex('#FFA500'),
+  accentColor: chalk.bold.hex('#00FF7F'),
+  secondaryColor: chalk.hex('#ADD8E6'),
+  primaryColor: chalk.bold.hex('#FF1493'),
+  dividerColor: chalk.hex('#FFD700'),
+};
+
+global.styles = styles;
 
 const handlerFiles = fs
   .readdirSync(path.join(__dirname, 'handlers'))
   .filter((file) => file.endsWith('.js'));
-
+let counter = 0;
 for (const file of handlerFiles) {
+  counter += 1;
   const handler = require(`./handlers/${file}`);
   if (typeof handler === 'function') {
     handler(client);
   }
 }
-
+console.log(
+  global.styles.successColor(`✅ Successfully loaded ${counter} handlers`)
+);
 client.login(process.env.DISCORD_TOKEN);
