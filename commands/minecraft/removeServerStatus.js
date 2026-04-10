@@ -1,42 +1,60 @@
 const { SlashCommandBuilder } = require('discord.js');
 const ServerStatus = require('../../models/ServerStatus');
 
-const OWNER_ID = '969181284784025670';
-
 module.exports = {
   data: new SlashCommandBuilder()
     .setName('removeserverstatus')
-    .setDescription('Remove a tracked server.')
-    .addStringOption(o =>
-      o.setName('servername').setDescription('Server name').setRequired(true)
+    .setDescription('Remove a Minecraft server from tracking.')
+    .addStringOption((option) =>
+      option
+        .setName('servername')
+        .setDescription('The name of the server to remove.')
+        .setRequired(true)
     )
-    .addStringOption(o =>
-      o.setName('serverip').setDescription('Server IP').setRequired(true)
+    .addStringOption((option) =>
+      option
+        .setName('serverip')
+        .setDescription('The IP address of the server to remove.')
+        .setRequired(true)
     ),
 
   async execute(interaction) {
-    if (interaction.user.id !== OWNER_ID) {
-      return interaction.reply({ content: '❌ Owner only.', ephemeral: true });
+    if (!interaction.member.permissions.has('ManageGuild')) {
+      return interaction.reply({
+        content:
+          'You do not have `ManageGuild` permission to remove server status!',
+        ephemeral: true,
+      });
     }
-
     const serverName = interaction.options.getString('servername');
     const serverIp = interaction.options.getString('serverip');
 
     const server = await ServerStatus.findOneAndDelete({
-      guildId: interaction.guild.id,
       serverName,
       serverIp,
     });
 
     if (!server) {
       return interaction.reply({
-        content: 'Server not found.',
+        content: `No server found with the name **${serverName}** and IP **${serverIp}**.`,
         ephemeral: true,
       });
     }
 
+    if (server.messageId) {
+      try {
+        const channel = await interaction.guild.channels.fetch(
+          server.channelId
+        );
+        const message = await channel.messages.fetch(server.messageId);
+        await message.delete();
+      } catch (error) {
+        console.error('Error deleting message:', error);
+      }
+    }
+
     return interaction.reply({
-      content: `✅ Removed **${serverName}**`,
+      content: `Successfully removed server status tracking for **${serverName}** (\`${serverIp}\`).`,
       ephemeral: true,
     });
   },
