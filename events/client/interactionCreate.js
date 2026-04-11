@@ -1,191 +1,196 @@
 const {
-  Events,
   ChannelType,
   PermissionFlagsBits,
   EmbedBuilder,
   ActionRowBuilder,
-  StringSelectMenuBuilder,
   ButtonBuilder,
   ButtonStyle,
+  ModalBuilder,
+  TextInputBuilder,
+  TextInputStyle,
+  StringSelectMenuBuilder,
 } = require('discord.js');
 
+const TicketPanel = require('../../models/TicketPanel');
 const Ticket = require('../../models/Ticket');
-const TicketSettings = require('../../models/TicketSettings');
-const TicketCategory = require('../../models/TicketCategory');
 const TicketBan = require('../../models/TicketBan');
+const TicketSettings = require('../../models/TicketSettings');
 
 module.exports = {
-  name: Events.InteractionCreate,
-  async execute(interaction, client) {
-    try {
-      // =========================
-      // TICKET DROPDOWN OPEN
-      // =========================
-      if (interaction.isStringSelectMenu() && interaction.customId === 'ticket_open_menu') {
-        const settings = await TicketSettings.findOne({ guildId: interaction.guild.id });
-        if (!settings?.enabled) return;
+  name: 'interactionCreate',
 
-        const banned = await TicketBan.findOne({
-          guildId: interaction.guild.id,
-          userId: interaction.user.id,
-        });
+  async execute(interaction) {
 
-        if (banned) {
-          return interaction.reply({
-            content: '❌ You are banned from creating tickets.',
-            ephemeral: true,
-          });
-        }
+    // =========================
+    // ADD CATEGORY MODAL
+    // =========================
+    if (interaction.isButton() && interaction.customId === 'setup_add_category') {
+      const modal = new ModalBuilder()
+        .setCustomId('modal_add_category')
+        .setTitle('➕ Add Category');
 
-        const categoryName = interaction.values[0];
-        const category = await TicketCategory.findOne({
-          guildId: interaction.guild.id,
-          name: categoryName,
-        });
+      const emoji = new TextInputBuilder()
+        .setCustomId('emoji')
+        .setLabel('Category Emoji')
+        .setStyle(TextInputStyle.Short);
 
-        if (!category) {
-          return interaction.reply({
-            content: '❌ Category not found.',
-            ephemeral: true,
-          });
-        }
+      const name = new TextInputBuilder()
+        .setCustomId('name')
+        .setLabel('Category Name')
+        .setStyle(TextInputStyle.Short);
 
-        // Ask reason dropdown
-        const reasonMenu = new StringSelectMenuBuilder()
-          .setCustomId(`ticket_reason_${category.name}`)
-          .setPlaceholder('🍁 Select Ticket Reason')
-          .addOptions([
-            { label: 'Support Issue', value: 'Support Issue', emoji: '⚡' },
-            { label: 'Payment Problem', value: 'Payment Problem', emoji: '💸' },
-            { label: 'Other', value: 'Other', emoji: '🌸' },
-          ]);
+      const desc = new TextInputBuilder()
+        .setCustomId('desc')
+        .setLabel('Description')
+        .setStyle(TextInputStyle.Paragraph);
 
-        return interaction.reply({
-          content: '🌟 Please select your reason:',
-          components: [new ActionRowBuilder().addComponents(reasonMenu)],
-          ephemeral: true,
-        });
-      }
+      modal.addComponents(
+        new ActionRowBuilder().addComponents(emoji),
+        new ActionRowBuilder().addComponents(name),
+        new ActionRowBuilder().addComponents(desc)
+      );
 
-      // =========================
-      // REASON SELECTED → CREATE TICKET
-      // =========================
-      if (interaction.isStringSelectMenu() && interaction.customId.startsWith('ticket_reason_')) {
-        const reason = interaction.values[0];
-        const categoryName = interaction.customId.replace('ticket_reason_', '');
+      return interaction.showModal(modal);
+    }
 
-        const settings = await TicketSettings.findOne({ guildId: interaction.guild.id });
-        const category = await TicketCategory.findOne({
-          guildId: interaction.guild.id,
-          name: categoryName,
-        });
+    // =========================
+    // SAVE CATEGORY FROM MODAL
+    // =========================
+    if (interaction.isModalSubmit() && interaction.customId === 'modal_add_category') {
+      const emoji = interaction.fields.getTextInputValue('emoji');
+      const name = interaction.fields.getTextInputValue('name');
+      const desc = interaction.fields.getTextInputValue('desc');
 
-        const existing = await Ticket.findOne({
-          guildId: interaction.guild.id,
-          userId: interaction.user.id,
-          status: 'open',
-        });
+      const panel = await TicketPanel.findOne({ guildId: interaction.guild.id });
 
-        if (existing) {
-          return interaction.reply({
-            content: '❌ You already have an open ticket.',
-            ephemeral: true,
-          });
-        }
+      panel.categories.push({
+        emoji,
+        name,
+        description: desc,
+      });
 
-        const channelName = `${category.name}-${interaction.user.username}-${reason}`
-          .toLowerCase()
-          .replace(/ /g, '-');
+      await panel.save();
 
-        const channel = await interaction.guild.channels.create({
-          name: channelName,
-          type: ChannelType.GuildText,
-          parent: settings.categoryId,
-          permissionOverwrites: [
-            {
-              id: interaction.guild.id,
-              deny: [PermissionFlagsBits.ViewChannel],
-            },
-            {
-              id: interaction.user.id,
-              allow: [
-                PermissionFlagsBits.ViewChannel,
-                PermissionFlagsBits.SendMessages,
-                PermissionFlagsBits.ReadMessageHistory,
-              ],
-            },
-            ...settings.supportRoleIds.map((id) => ({
-              id,
-              allow: [
-                PermissionFlagsBits.ViewChannel,
-                PermissionFlagsBits.SendMessages,
-                PermissionFlagsBits.ReadMessageHistory,
-              ],
-            })),
-          ],
-        });
+      return interaction.reply({
+        content: `✅ Category added: ${emoji} ${name}`,
+        ephemeral: true,
+      });
+    }
 
-        const ticket = await Ticket.create({
-          guildId: interaction.guild.id,
-          channelId: channel.id,
-          userId: interaction.user.id,
-          status: 'open',
-          reason,
-        });
+    // =========================
+    // CREATE PANEL (USER SIDE)
+    // =========================
+    if (interaction.isStringSelectMenu() && interaction.customId === 'ticket_open_menu') {
+      const categoryName = interaction.values[0];
 
-        // Close button
-        const closeBtn = new ButtonBuilder()
-          .setCustomId('ticket_close')
-          .setLabel('Close Ticket')
-          .setStyle(ButtonStyle.Danger)
-          .setEmoji('❄️');
+      const panel = await TicketPanel.findOne({ guildId: interaction.guild.id });
+      const category = panel.categories.find(c => c.name === categoryName);
 
-        const row = new ActionRowBuilder().addComponents(closeBtn);
+      const modal = new ModalBuilder()
+        .setCustomId(`ticket_reason_${categoryName}`)
+        .setTitle('🌸 Ticket Reason');
 
-        // First embed message
-        const embed = new EmbedBuilder()
-          .setColor('#FFD700')
-          .setTitle(`🌸 Ticket: ${reason}`)
-          .setDescription(
-            `⚡ User: <@${interaction.user.id}>\n🍁 Reason: **${reason}**\n🌟 Time: <t:${Math.floor(Date.now() / 1000)}:F>`
-          )
-          .setFooter({ text: 'Ticket System Active' });
+      const input = new TextInputBuilder()
+        .setCustomId('reason')
+        .setLabel('Describe your issue')
+        .setStyle(TextInputStyle.Paragraph);
 
-        await channel.send({
-          content: `${interaction.user} | <@&${settings.supportRoleIds.join('> <@&')}>`,
-          embeds: [embed],
-          components: [row],
-        });
+      modal.addComponents(new ActionRowBuilder().addComponents(input));
 
-        return interaction.reply({
-          content: `✅ Ticket created: ${channel}`,
-          ephemeral: true,
-        });
-      }
+      return interaction.showModal(modal);
+    }
 
-      // =========================
-      // CLOSE TICKET
-      // =========================
-      if (interaction.isButton() && interaction.customId === 'ticket_close') {
-        const ticket = await Ticket.findOne({ channelId: interaction.channel.id });
-        if (!ticket) return;
+    // =========================
+    // CREATE TICKET
+    // =========================
+    if (interaction.isModalSubmit() && interaction.customId.startsWith('ticket_reason_')) {
+      const category = interaction.customId.replace('ticket_reason_', '');
+      const reason = interaction.fields.getTextInputValue('reason');
 
-        await interaction.reply({ content: '❄️ Closing ticket...' });
+      const settings = await TicketSettings.findOne({ guildId: interaction.guild.id });
 
-        const logChannel = interaction.guild.channels.cache.get(
-          (await TicketSettings.findOne({ guildId: interaction.guild.id }))?.logChannelId
+      const channel = await interaction.guild.channels.create({
+        name: `${category}-${interaction.user.username}-1`,
+        type: ChannelType.GuildText,
+        parent: settings.categoryId,
+        permissionOverwrites: [
+          {
+            id: interaction.guild.id,
+            deny: [PermissionFlagsBits.ViewChannel],
+          },
+          {
+            id: interaction.user.id,
+            allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages],
+          },
+          ...settings.supportRoleIds.map(r => ({
+            id: r,
+            allow: [PermissionFlagsBits.ViewChannel],
+          })),
+        ],
+      });
+
+      const row = new ActionRowBuilder().addComponents(
+        new ButtonBuilder().setCustomId('close').setLabel('Close').setStyle(ButtonStyle.Danger),
+        new ButtonBuilder().setCustomId('add').setLabel('Add').setStyle(ButtonStyle.Success),
+        new ButtonBuilder().setCustomId('kick').setLabel('Kick').setStyle(ButtonStyle.Secondary),
+        new ButtonBuilder().setCustomId('ban').setLabel('Ban').setStyle(ButtonStyle.Danger),
+        new ButtonBuilder().setCustomId('unban').setLabel('Unban').setStyle(ButtonStyle.Primary),
+      );
+
+      const embed = new EmbedBuilder()
+        .setTitle(`🌟 Ticket: ${category}`)
+        .setDescription(
+          `🍁 User: <@${interaction.user.id}>\n⚡ Reason: ${reason}\n❄️ Time: <t:${Math.floor(Date.now()/1000)}:F>`
         );
 
-        if (logChannel) {
-          logChannel.send({
-            content: `📄 Ticket closed: ${interaction.channel.name}`,
-          });
-        }
+      await channel.send({
+        content: `<@${interaction.user.id}>`,
+        embeds: [embed],
+        components: [row],
+      });
 
-        setTimeout(() => interaction.channel.delete(), 3000);
-      }
-    } catch (err) {
-      console.error(err);
+      return interaction.reply({
+        content: `✅ Ticket created: ${channel}`,
+        ephemeral: true,
+      });
     }
-  },
+
+    // =========================
+    // BUTTON SYSTEM
+    // =========================
+    if (interaction.isButton()) {
+
+      const channel = interaction.channel;
+
+      if (interaction.customId === 'close') {
+        await interaction.reply({ content: '❄️ Closing ticket...' });
+        return setTimeout(() => channel.delete(), 2000);
+      }
+
+      if (interaction.customId === 'add') {
+        await channel.permissionOverwrites.edit(interaction.user.id, {
+          ViewChannel: true,
+          SendMessages: true,
+        });
+
+        return interaction.reply({ content: '➕ Added', ephemeral: true });
+      }
+
+      if (interaction.customId === 'ban') {
+        await TicketBan.create({
+          guildId: interaction.guild.id,
+          userId: interaction.user.id,
+          reason: 'Manual ban',
+        });
+
+        return interaction.reply({ content: '🚫 Banned', ephemeral: true });
+      }
+
+      if (interaction.customId === 'unban') {
+        await TicketBan.deleteOne({ userId: interaction.user.id });
+
+        return interaction.reply({ content: '✅ Unbanned', ephemeral: true });
+      }
+    }
+  }
 };
