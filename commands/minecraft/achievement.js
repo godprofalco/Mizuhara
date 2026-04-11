@@ -3,13 +3,16 @@ const {
   ActionRowBuilder,
   ButtonBuilder,
   ButtonStyle,
+  AttachmentBuilder,
 } = require('discord.js');
 
-// 🔥 ITEM LIST (you can expand anytime)
+const { createCanvas, loadImage } = require('@napi-rs/canvas');
+const path = require('path');
+
+// 🔥 ITEMS (autocomplete list)
 const items = [
   "grass",
   "stone",
-  "cobblestone",
   "diamond",
   "iron_ingot",
   "gold_ingot",
@@ -28,53 +31,44 @@ const items = [
   "mace",
   "apple",
   "golden_apple",
-  "enchanted_golden_apple",
   "tnt",
   "redstone",
-  "hopper",
   "chest",
   "furnace",
   "crafting_table",
   "anvil",
-  "book",
-  "written_book"
+  "book"
 ];
 
-// 🔥 SAFE ICON MAPPING (prevents API break)
-const iconMap = {
-  grass: 1,
-  stone: 20,
-  cobblestone: 20,
-  diamond: 2,
-  iron_ingot: 22,
-  gold_ingot: 23,
-  netherite_ingot: 742,
-  diamond_sword: 3,
-  netherite_sword: 743,
-  bow: 34,
-  crossbow: 358,
-  shield: 442,
-  elytra: 444,
-  totem_of_undying: 449,
-  end_crystal: 426,
-  dragon_egg: 122,
-  beacon: 138,
-  trident: 650,
-  apple: 260,
-  golden_apple: 322,
-  enchanted_golden_apple: 466,
-  tnt: 46,
-  redstone: 331,
-  hopper: 154,
-  chest: 54,
-  furnace: 61,
-  crafting_table: 58,
-  anvil: 145,
-  book: 340,
-  written_book: 387,
-
-  // ⚠️ NEW ITEM (MACE) — fallback safe icon
-  mace: 3
+// 🔥 TEXTURE MAP (THIS FIXES MACE + CRYSTAL ISSUE)
+const textures = {
+  grass: "grass.png",
+  stone: "stone.png",
+  diamond: "diamond.png",
+  iron_ingot: "iron.png",
+  gold_ingot: "gold.png",
+  netherite_ingot: "netherite.png",
+  diamond_sword: "diamond_sword.png",
+  netherite_sword: "netherite_sword.png",
+  bow: "bow.png",
+  crossbow: "crossbow.png",
+  shield: "shield.png",
+  elytra: "elytra.png",
+  totem_of_undying: "totem.png",
+  end_crystal: "end_crystal.png",
+  dragon_egg: "dragon_egg.png",
+  beacon: "beacon.png",
+  trident: "trident.png",
+  mace: "mace.png",
+  apple: "apple.png",
+  golden_apple: "golden_apple.png",
+  tnt: "tnt.png",
+  redstone: "redstone.png",
+  chest: "chest.png",
+  furnace: "furnace.png",
+  crafting_table: "crafting_table.png",
+  anvil: "anvil.png",
+  book: "book.png"
 };
 
 module.exports = {
@@ -85,7 +79,7 @@ module.exports = {
     .addStringOption(option =>
       option
         .setName('icon')
-        .setDescription('Choose item (diamond, elytra, mace, etc.)')
+        .setDescription('Choose item (mace, elytra, diamond, etc.)')
         .setRequired(true)
         .setAutocomplete(true)
     )
@@ -109,45 +103,62 @@ module.exports = {
     const focused = interaction.options.getFocused().toLowerCase();
 
     const filtered = items
-      .filter(item => item.includes(focused))
+      .filter(i => i.includes(focused))
       .slice(0, 25);
 
     await interaction.respond(
-      filtered.map(item => ({
-        name: item.replace(/_/g, ' '),
-        value: item
+      filtered.map(i => ({
+        name: i.replace(/_/g, ' '),
+        value: i
       }))
     );
   },
 
-  // 🔥 EXECUTE
+  // 🔥 MAIN RENDER (NO API)
   async execute(interaction) {
+    const iconName = interaction.options.getString('icon').toLowerCase();
     const head = interaction.options.getString('head');
     const text = interaction.options.getString('text');
-    const iconName = interaction.options.getString('icon').toLowerCase();
 
-    // 🔥 SAFE ICON RESOLVE
-    const iconId = iconMap[iconName] ?? iconMap.diamond_sword;
+    const canvas = createCanvas(420, 90);
+    const ctx = canvas.getContext('2d');
 
-    const url = `https://minecraftskinstealer.com/achievement/${encodeURIComponent(iconId)}/${encodeURIComponent(head)}/${encodeURIComponent(text)}`;
+    // Background
+    ctx.fillStyle = "#2b2b2b";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-    const row = new ActionRowBuilder().addComponents(
-      new ButtonBuilder()
-        .setLabel('Download Achievement')
-        .setStyle(ButtonStyle.Link)
-        .setURL(url)
-    );
+    ctx.strokeStyle = "#555";
+    ctx.strokeRect(0, 0, canvas.width, canvas.height);
+
+    // Load icon safely
+    const file = textures[iconName] || "stone.png";
+    const iconPath = path.join(__dirname, "../textures", file);
+
+    let icon;
+    try {
+      icon = await loadImage(iconPath);
+    } catch {
+      icon = await loadImage(path.join(__dirname, "../textures/stone.png"));
+    }
+
+    // Draw icon
+    ctx.drawImage(icon, 10, 15, 60, 60);
+
+    // Text
+    ctx.fillStyle = "#ffffff";
+    ctx.font = "bold 18px Arial";
+    ctx.fillText("Achievement Get!", 85, 30);
+
+    ctx.font = "16px Arial";
+    ctx.fillText(head, 85, 55);
+    ctx.fillText(text, 85, 75);
+
+    const attachment = new AttachmentBuilder(canvas.toBuffer(), {
+      name: "achievement.png",
+    });
 
     await interaction.reply({
-      embeds: [
-        {
-          title: '🏆 Minecraft Achievement',
-          description: 'Custom achievement unlocked!',
-          image: { url },
-          color: 0xffaa00,
-        },
-      ],
-      components: [row],
+      files: [attachment],
     });
   },
 };
