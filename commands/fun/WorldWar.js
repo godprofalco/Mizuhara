@@ -9,7 +9,7 @@ const {
 
 const WorldWar = require('../../models/WorldWar');
 const path = require('path');
-const Canvas = require('@napi-rs/canvas');
+const Canvas = require('canvas');
 const sharp = require('sharp');
 const fetch = require('node-fetch');
 
