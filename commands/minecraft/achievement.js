@@ -6,7 +6,7 @@ const {
 const { createCanvas, loadImage } = require('@napi-rs/canvas');
 const path = require('path');
 
-// 🎯 ICON LIST (what users can type)
+// 🎯 ICON LIST
 const items = [
   "stone",
   "diamond",
@@ -21,14 +21,12 @@ const items = [
   "furnace",
   "crafting_table",
 
-  // 🧟 mobs / heads
   "creeper_head",
   "skeleton_skull",
   "wither_skeleton_skull",
   "zombie_head",
   "dragon_head",
 
-  // 🔥 mobs drops
   "blaze_rod",
   "blaze_powder",
   "ghast_tear",
@@ -67,10 +65,10 @@ const textures = {
 module.exports = {
   data: new SlashCommandBuilder()
     .setName('achievement')
-    .setDescription('Generate a Minecraft-style achievement')
+    .setDescription('Minecraft Achievement Generator')
     .addStringOption(o =>
       o.setName('icon')
-        .setDescription('Choose icon')
+        .setDescription('Select icon')
         .setRequired(true)
         .setAutocomplete(true)
     )
@@ -101,7 +99,7 @@ module.exports = {
   },
 
   async execute(interaction) {
-    const iconName = interaction.options.getString('icon').toLowerCase();
+    const iconName = interaction.options.getString('icon')?.toLowerCase();
     const head = interaction.options.getString('head');
     const text = interaction.options.getString('text');
 
@@ -115,21 +113,22 @@ module.exports = {
     ctx.strokeStyle = "#555";
     ctx.strokeRect(0, 0, canvas.width, canvas.height);
 
-    // icon
-    const file = textures[iconName] || "stone.png";
-    const iconPath = path.join(__dirname, "../textures", file);
+    // safe icon resolve
+    const file = textures?.[iconName] || "stone.png";
+    const iconPath = path.resolve(__dirname, "../textures", file);
 
     let icon;
     try {
       icon = await loadImage(iconPath);
-    } catch {
-      icon = await loadImage(path.join(__dirname, "../textures/stone.png"));
+    } catch (err) {
+      icon = await loadImage(path.resolve(__dirname, "../textures/stone.png"));
     }
 
+    // draw icon
     ctx.drawImage(icon, 10, 15, 60, 60);
 
     // text
-    ctx.fillStyle = "#fff";
+    ctx.fillStyle = "#ffffff";
     ctx.font = "bold 18px Arial";
     ctx.fillText("Achievement Get!", 85, 30);
 
