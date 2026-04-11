@@ -1,21 +1,20 @@
 const mongoose = require('mongoose');
 
-const categorySchema = new mongoose.Schema({
+const dropdownSchema = new mongoose.Schema({
   name: String,
   emoji: String,
   description: String,
+  channelCategoryId: { type: String, default: null },
 });
 
-const ticketPanelSchema = new mongoose.Schema({
+const panelSchema = new mongoose.Schema({
   guildId: String,
 
   title: String,
   description: String,
   footer: String,
 
-  categories: [categorySchema], // ✅ dynamic categories
-
-  createdAt: { type: Date, default: Date.now },
+  dropdowns: [dropdownSchema],
 });
 
-module.exports = mongoose.model('TicketPanel', ticketPanelSchema);
+module.exports = mongoose.model('TicketPanel', panelSchema);
