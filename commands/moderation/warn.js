@@ -13,141 +13,140 @@ module.exports = {
     .setDefaultMemberPermissions(PermissionFlagsBits.ModerateMembers)
     .setName('warn')
     .setDescription('Warn a user or remove a warn')
+
     .addSubcommand((subcommand) =>
       subcommand
         .setName('add')
         .setDescription('Warn a user')
-        .addUserOption((option) => {
-          return option
+        .addUserOption((option) =>
+          option
             .setName('user')
             .setDescription('The user to warn')
-            .setRequired(true);
-        })
-        .addStringOption((option) => {
-          return option
+            .setRequired(true)
+        )
+        .addStringOption((option) =>
+          option
             .setName('reason')
             .setDescription('The reason for the warn')
             .setRequired(true)
-            .setMaxLength(500);
-        })
+            .setMaxLength(500)
+        )
     )
+
     .addSubcommand((subcommand) =>
       subcommand
         .setName('remove')
         .setDescription('Remove a warn from a user')
-        .addStringOption((option) => {
-          return option
+        .addStringOption((option) =>
+          option
             .setName('warn_id')
             .setDescription('The id of the warn to remove')
             .setRequired(true)
             .setMinLength(24)
-            .setMaxLength(24);
-        })
+            .setMaxLength(24)
+        )
     ),
 
   async execute(interaction) {
-    if (!interaction.member.permissions.has('KickMembers')) {
+    if (!interaction.member.permissions.has(PermissionFlagsBits.KickMembers)) {
       return interaction.reply({
-        content: 'You do not have `KickMembers` permission to manage warnings!',
+        content: 'You do not have `KickMembers` permission!',
         ephemeral: true,
       });
     }
-    switch (interaction.options.getSubcommand()) {
-      case 'add':
-        {
-          const { options, guild, member } = interaction;
-          const user = options.getUser('user');
-          const reason = options.getString('reason');
-          const warnTime = time();
 
-          const warnSchema = new warnings({
-            _id: new Types.ObjectId(),
-            guildId: guild.id,
-            userId: user.id,
-            warnReason: reason,
-            moderator: member.user.id,
-            warnDate: warnTime,
-          });
+    const sub = interaction.options.getSubcommand();
 
-          warnSchema.save().catch((error) => console.log(error));
+    // ================= ADD WARN =================
+    if (sub === 'add') {
+      const user = interaction.options.getUser('user');
+      const reason = interaction.options.getString('reason');
 
-          await interaction.reply({
-            embeds: [
-              new EmbedBuilder()
-                .setColor(0xff0000)
-                .setTitle('Member Warned')
-                .setDescription(`⚠️ <@${user.id}> has been warned`)
-                .addFields(
-                  {
-                    name: 'Reason',
-                    value: `${reason}`,
-                    inline: true,
-                  },
-                  {
-                    name: 'Warned by',
-                    value: `<@${interaction.user.id}>`,
-                    inline: true,
-                  }
-                )
-                .setTimestamp(),
-            ],
-          });
+      const warnData = new warnings({
+        _id: new Types.ObjectId(),
+        guildId: interaction.guild.id,
+        userId: user.id,
+        warnReason: reason,
+        moderator: interaction.user.id,
+        warnDate: new Date(),
+      });
 
-          user
-            .send({
-              embeds: [
-                new EmbedBuilder()
-                  .setTitle(`⚠️You have been warned in: ${guild.name}`)
-                  .addFields(
-                    {
-                      name: 'Reason',
-                      value: `${reason}`,
-                      inline: true,
-                    },
-                    {
-                      name: 'Warned by',
-                      value: `<@${interaction.user.id}>`,
-                      inline: true,
-                    }
-                  )
-                  .setTimestamp()
-                  .setColor(0xff0000),
-              ],
-            })
-            .catch(async (error) => {
-              console.log(error);
-              await interaction.followUp({
-                embeds: [
-                  new EmbedBuilder()
-                    .setTitle('❌ User has dms disabled so no DM was sent.')
-                    .setColor(0xff0000),
-                ],
-              });
-            });
-        }
-        break;
+      await warnData.save().catch(console.error);
 
-      case 'remove': {
-        const guildId = interaction.guild.id;
-        const warnId = interaction.options.getString('warn_id');
+      await interaction.reply({
+        embeds: [
+          new EmbedBuilder()
+            .setColor(0xff0000)
+            .setTitle('⚠️ Member Warned')
+            .setDescription(`<@${user.id}> has been warned`)
+            .addFields(
+              { name: 'Reason', value: reason },
+              { name: 'Moderator', value: `<@${interaction.user.id}>` }
+            )
+            .setTimestamp(),
+        ],
+      });
 
-        const error = new EmbedBuilder()
-          .setDescription(`No warn Id watching \`${warnId}\` was found!`)
-          .setColor(0xed4245);
-        data = await warnings.findOne({ _id: warnId, guildId: guildId });
-        if (!data) return await interaction.reply({ embeds: [error] });
-
-        await warnings.deleteOne({ _id: warnId, guildId: guildId });
-
-        const embed = new EmbedBuilder()
-          .setTitle('Remove Infraction')
-          .setDescription(
-            `Successfully removed the warn with the ID matching \`${warnId}\``
-          )
-          .setColor(5763719)
-          .setTimestamp();
-        return await interaction.reply({ embeds: [embed] });
+      // DM user safely
+      try {
+        await user.send({
+          embeds: [
+            new EmbedBuilder()
+              .setTitle(`⚠️ You were warned in ${interaction.guild.name}`)
+              .addFields(
+                { name: 'Reason', value: reason },
+                { name: 'Moderator', value: `<@${interaction.user.id}>` }
+              )
+              .setColor(0xff0000)
+              .setTimestamp(),
+          ],
+        });
+      } catch {
+        await interaction.followUp({
+          content: '⚠️ Could not DM user.',
+          ephemeral: true,
+        });
       }
+    }
+
+    // ================= REMOVE WARN =================
+    if (sub === 'remove') {
+      const warnId = interaction.options.getString('warn_id');
+
+      let data;
+      try {
+        data = await warnings.findOne({
+          _id: warnId,
+          guildId: interaction.guild.id,
+        });
+      } catch {
+        return interaction.reply({
+          content: '❌ Invalid warn ID format.',
+          ephemeral: true,
+        });
+      }
+
+      if (!data) {
+        return interaction.reply({
+          content: `❌ No warn found with ID: ${warnId}`,
+          ephemeral: true,
+        });
+      }
+
+      await warnings.deleteOne({
+        _id: warnId,
+        guildId: interaction.guild.id,
+      });
+
+      return interaction.reply({
+        embeds: [
+          new EmbedBuilder()
+            .setTitle('✅ Warn Removed')
+            .setDescription(`Removed warn ID: \`${warnId}\``)
+            .setColor(0x57f287)
+            .setTimestamp(),
+        ],
+      });
     }
   },
 };
