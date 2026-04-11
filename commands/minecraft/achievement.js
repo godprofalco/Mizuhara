@@ -1,104 +1,90 @@
 const {
   SlashCommandBuilder,
-  ActionRowBuilder,
-  ButtonBuilder,
-  ButtonStyle,
   AttachmentBuilder,
 } = require('discord.js');
 
 const { createCanvas, loadImage } = require('@napi-rs/canvas');
 const path = require('path');
 
-// 🔥 ITEMS (autocomplete list)
+// 🎯 ICON LIST (what users can type)
 const items = [
-  "grass",
   "stone",
   "diamond",
-  "iron_ingot",
-  "gold_ingot",
-  "netherite_ingot",
-  "diamond_sword",
-  "netherite_sword",
-  "bow",
-  "crossbow",
-  "shield",
-  "elytra",
-  "totem_of_undying",
-  "end_crystal",
-  "dragon_egg",
-  "beacon",
-  "trident",
+  "iron",
+  "gold",
+  "netherite",
   "mace",
-  "apple",
-  "golden_apple",
+  "end_crystal",
+  "elytra",
   "tnt",
-  "redstone",
   "chest",
   "furnace",
   "crafting_table",
-  "anvil",
-  "book"
+
+  // 🧟 mobs / heads
+  "creeper_head",
+  "skeleton_skull",
+  "wither_skeleton_skull",
+  "zombie_head",
+  "dragon_head",
+
+  // 🔥 mobs drops
+  "blaze_rod",
+  "blaze_powder",
+  "ghast_tear",
+  "ender_pearl",
+  "nether_star"
 ];
 
-// 🔥 TEXTURE MAP (THIS FIXES MACE + CRYSTAL ISSUE)
+// 🖼️ TEXTURE MAP
 const textures = {
-  grass: "grass.png",
   stone: "stone.png",
   diamond: "diamond.png",
-  iron_ingot: "iron.png",
-  gold_ingot: "gold.png",
-  netherite_ingot: "netherite.png",
-  diamond_sword: "diamond_sword.png",
-  netherite_sword: "netherite_sword.png",
-  bow: "bow.png",
-  crossbow: "crossbow.png",
-  shield: "shield.png",
-  elytra: "elytra.png",
-  totem_of_undying: "totem.png",
-  end_crystal: "end_crystal.png",
-  dragon_egg: "dragon_egg.png",
-  beacon: "beacon.png",
-  trident: "trident.png",
+  iron: "iron.png",
+  gold: "gold.png",
+  netherite: "netherite.png",
   mace: "mace.png",
-  apple: "apple.png",
-  golden_apple: "golden_apple.png",
+  end_crystal: "end_crystal.png",
+  elytra: "elytra.png",
   tnt: "tnt.png",
-  redstone: "redstone.png",
   chest: "chest.png",
   furnace: "furnace.png",
   crafting_table: "crafting_table.png",
-  anvil: "anvil.png",
-  book: "book.png"
+
+  creeper_head: "creeper_head.png",
+  skeleton_skull: "skeleton_skull.png",
+  wither_skeleton_skull: "wither_skeleton_skull.png",
+  zombie_head: "zombie_head.png",
+  dragon_head: "dragon_head.png",
+
+  blaze_rod: "blaze_rod.png",
+  blaze_powder: "blaze_powder.png",
+  ghast_tear: "ghast_tear.png",
+  ender_pearl: "ender_pearl.png",
+  nether_star: "nether_star.png"
 };
 
 module.exports = {
   data: new SlashCommandBuilder()
     .setName('achievement')
     .setDescription('Generate a Minecraft-style achievement')
-
-    .addStringOption(option =>
-      option
-        .setName('icon')
-        .setDescription('Choose item (mace, elytra, diamond, etc.)')
+    .addStringOption(o =>
+      o.setName('icon')
+        .setDescription('Choose icon')
         .setRequired(true)
         .setAutocomplete(true)
     )
-
-    .addStringOption(option =>
-      option
-        .setName('head')
-        .setDescription('Achievement title')
+    .addStringOption(o =>
+      o.setName('head')
+        .setDescription('Title')
         .setRequired(true)
     )
-
-    .addStringOption(option =>
-      option
-        .setName('text')
-        .setDescription('Achievement description')
+    .addStringOption(o =>
+      o.setName('text')
+        .setDescription('Description')
         .setRequired(true)
     ),
 
-  // 🔥 AUTOCOMPLETE
   async autocomplete(interaction) {
     const focused = interaction.options.getFocused().toLowerCase();
 
@@ -114,7 +100,6 @@ module.exports = {
     );
   },
 
-  // 🔥 MAIN RENDER (NO API)
   async execute(interaction) {
     const iconName = interaction.options.getString('icon').toLowerCase();
     const head = interaction.options.getString('head');
@@ -123,14 +108,14 @@ module.exports = {
     const canvas = createCanvas(420, 90);
     const ctx = canvas.getContext('2d');
 
-    // Background
+    // background
     ctx.fillStyle = "#2b2b2b";
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
     ctx.strokeStyle = "#555";
     ctx.strokeRect(0, 0, canvas.width, canvas.height);
 
-    // Load icon safely
+    // icon
     const file = textures[iconName] || "stone.png";
     const iconPath = path.join(__dirname, "../textures", file);
 
@@ -141,11 +126,10 @@ module.exports = {
       icon = await loadImage(path.join(__dirname, "../textures/stone.png"));
     }
 
-    // Draw icon
     ctx.drawImage(icon, 10, 15, 60, 60);
 
-    // Text
-    ctx.fillStyle = "#ffffff";
+    // text
+    ctx.fillStyle = "#fff";
     ctx.font = "bold 18px Arial";
     ctx.fillText("Achievement Get!", 85, 30);
 
@@ -157,8 +141,6 @@ module.exports = {
       name: "achievement.png",
     });
 
-    await interaction.reply({
-      files: [attachment],
-    });
+    await interaction.reply({ files: [attachment] });
   },
 };
