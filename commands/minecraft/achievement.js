@@ -1,15 +1,15 @@
 const {
   SlashCommandBuilder,
-  AttachmentBuilder,
   EmbedBuilder,
   ActionRowBuilder,
   ButtonBuilder,
-  ButtonStyle
+  ButtonStyle,
+  AttachmentBuilder
 } = require('discord.js');
 
 const { createCanvas, loadImage } = require('canvas');
-const fs = require('fs');
 const path = require('path');
+const fs = require('fs');
 
 // ================= ICON MAP =================
 const iconMap = {
@@ -50,12 +50,12 @@ module.exports = {
     )
     .addStringOption(o =>
       o.setName('head')
-        .setDescription('Title')
+        .setDescription('Achievement title')
         .setRequired(true)
     )
     .addStringOption(o =>
       o.setName('text')
-        .setDescription('Description')
+        .setDescription('Achievement description')
         .setRequired(true)
     ),
 
@@ -79,77 +79,82 @@ module.exports = {
     const head = interaction.options.getString('head');
     const text = interaction.options.getString('text');
 
+    // ================= OLD API BACKGROUND =================
+    const apiUrl =
+      `https://minecraftskinstealer.com/achievement/2/${encodeURIComponent(head)}/${encodeURIComponent(text)}`;
+
+    let baseImage;
     try {
-      // ================= BASE API IMAGE =================
-      const apiUrl = `https://minecraftskinstealer.com/achievement/2/${encodeURIComponent(head)}/${encodeURIComponent(text)}`;
-      const baseImage = await loadImage(apiUrl);
-
-      // ================= STRICT ICON LOAD (NO DUPLICATES) =================
-      if (!iconMap.hasOwnProperty(icon)) {
-        return interaction.editReply("❌ Invalid icon selected.");
-      }
-
-      const iconPath = path.join(process.cwd(), "textures", iconMap[icon]);
-
-      if (!fs.existsSync(iconPath)) {
-        return interaction.editReply(`❌ Missing texture: ${iconMap[icon]}`);
-      }
-
-      const iconImage = await loadImage(iconPath);
-
-      // ================= CANVAS =================
-      const canvas = createCanvas(baseImage.width, baseImage.height);
-      const ctx = canvas.getContext("2d");
-
-      ctx.drawImage(baseImage, 0, 0);
-
-      // ================= ICON (ONLY ONCE - FIXED) =================
-      const iconSize = 48;
-      const iconX = 14;
-      const iconY = 14;
-
-      ctx.drawImage(iconImage, iconX, iconY, iconSize, iconSize);
-
-      // ================= TEXT LAYOUT (NO OVERLAP) =================
-      const textX = iconX + iconSize + 12;
-
-      ctx.fillStyle = "#FFFFFF";
-      ctx.font = "bold 16px sans-serif";
-      ctx.fillText(head, textX, 30);
-
-      ctx.font = "14px sans-serif";
-      ctx.fillText(text, textX, 55);
-
-      const buffer = canvas.toBuffer("image/png");
-
-      const attachment = new AttachmentBuilder(buffer, {
-        name: "achievement.png"
-      });
-
-      // ================= EMBED =================
-      const embed = new EmbedBuilder()
-        .setTitle("🏆 Minecraft Achievement")
-        .setDescription("Custom achievement unlocked!")
-        .setColor(0xffaa00)
-        .setImage("attachment://achievement.png");
-
-      // ================= BUTTON =================
-      const row = new ActionRowBuilder().addComponents(
-        new ButtonBuilder()
-          .setLabel("Download")
-          .setStyle(ButtonStyle.Link)
-          .setURL(apiUrl)
-      );
-
-      return interaction.editReply({
-        embeds: [embed],
-        components: [row],
-        files: [attachment]
-      });
-
-    } catch (err) {
-      console.error(err);
-      return interaction.editReply("❌ Failed to generate achievement.");
+      baseImage = await loadImage(apiUrl);
+    } catch {
+      return interaction.editReply("❌ Failed to load achievement API image.");
     }
+
+    // ================= VALID ICON =================
+    if (!iconMap[icon]) {
+      return interaction.editReply("❌ Invalid icon selected.");
+    }
+
+    const iconPath = path.join(process.cwd(), "textures", iconMap[icon]);
+
+    if (!fs.existsSync(iconPath)) {
+      return interaction.editReply("❌ Missing texture file in /textures.");
+    }
+
+    let iconImage;
+    try {
+      iconImage = await loadImage(iconPath);
+    } catch {
+      return interaction.editReply("❌ Failed to load icon texture.");
+    }
+
+    // ================= CANVAS (ICON ONLY) =================
+    const canvas = createCanvas(baseImage.width, baseImage.height);
+    const ctx = canvas.getContext("2d");
+
+    // draw API image (old Minecraft look)
+    ctx.drawImage(baseImage, 0, 0);
+
+    // ================= PERFECT ICON ALIGNMENT =================
+    const iconSize = 48;
+
+    const paddingLeft = 12; // safe border distance
+    const iconX = paddingLeft;
+    const iconY = Math.floor((baseImage.height - iconSize) / 2);
+
+    // prevents clipping at edges
+    const safeX = Math.max(paddingLeft, iconX);
+    const safeY = Math.max(6, iconY);
+
+    ctx.drawImage(iconImage, safeX, safeY, iconSize, iconSize);
+
+    // ================= FINAL IMAGE =================
+    const buffer = canvas.toBuffer("image/png");
+
+    const attachment = new AttachmentBuilder(buffer, {
+      name: "achievement.png"
+    });
+
+    // ================= EMBED (OLD STYLE) =================
+    const embed = new EmbedBuilder()
+      .setTitle("🏆 Minecraft Achievement")
+      .setDescription("Custom achievement unlocked!")
+      .setColor(0xffaa00)
+      .setImage("attachment://achievement.png");
+
+    // ================= DOWNLOAD BUTTON =================
+    const row = new ActionRowBuilder().addComponents(
+      new ButtonBuilder()
+        .setLabel("Download Achievement")
+        .setStyle(ButtonStyle.Link)
+        .setURL(apiUrl)
+    );
+
+    // ================= SAFE SEND =================
+    return interaction.editReply({
+      embeds: [embed],
+      components: [row],
+      files: [attachment]
+    });
   }
 };
