@@ -1,12 +1,10 @@
 const mongoose = require('mongoose');
 
-const schema = new mongoose.Schema({
+module.exports = mongoose.model('TicketSettings', new mongoose.Schema({
   guildId: String,
-  enabled: { type: Boolean, default: false },
+  enabled: { type: Boolean, default: true },
   categoryId: String,
   logChannelId: String,
   supportRoleIds: [String],
-  ticketLimit: Number,
-});
-
-module.exports = mongoose.model('TicketSettings', schema);
+  ticketLimit: { type: Number, default: 3 },
+}));
