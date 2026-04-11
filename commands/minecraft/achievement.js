@@ -1,38 +1,37 @@
 const {
   SlashCommandBuilder,
   AttachmentBuilder,
+  EmbedBuilder,
+  ActionRowBuilder,
+  ButtonBuilder,
+  ButtonStyle
 } = require('discord.js');
 
 const { createCanvas, loadImage } = require('canvas');
-const path = require('path');
-const fs = require('fs');
 
-// ICONS
-const textures = {
-  stone: "stone.png",
-  diamond: "diamond.png",
-  iron: "iron.png",
-  gold: "gold.png",
-  netherite: "netherite.png",
-  mace: "mace.png",
-  elytra: "elytra.png",
-  tnt: "tnt.png",
-  chest: "chest.png",
-  furnace: "furnace.png",
-  crafting_table: "crafting_table.png",
+// ICON MAP (NO FILES)
+const iconMap = {
+  stone: "https://minecraft.wiki/images/Stone_JE5_BE3.png",
+  diamond: "https://minecraft.wiki/images/Diamond_JE3_BE3.png",
+  iron: "https://minecraft.wiki/images/Iron_Ingot_JE3_BE2.png",
+  gold: "https://minecraft.wiki/images/Gold_Ingot_JE3_BE2.png",
+  netherite: "https://minecraft.wiki/images/Netherite_Ingot_JE1_BE1.png",
+  mace: "https://minecraft.wiki/images/Mace_JE1_BE1.png",
+  elytra: "https://minecraft.wiki/images/Elytra_JE1_BE1.png",
+  tnt: "https://minecraft.wiki/images/TNT_JE3_BE2.png",
+  chest: "https://minecraft.wiki/images/Chest_JE2_BE2.png",
+  furnace: "https://minecraft.wiki/images/Furnace_JE3_BE2.png"
 };
-
-// optional fallback
-const fallback = "stone.png";
 
 module.exports = {
   data: new SlashCommandBuilder()
     .setName('achievement')
-    .setDescription('Minecraft Achievement Generator')
+    .setDescription('Minecraft Achievement')
     .addStringOption(o =>
       o.setName('icon')
-        .setDescription('Icon name')
+        .setDescription('Item icon')
         .setRequired(true)
+        .setAutocomplete(true)
     )
     .addStringOption(o =>
       o.setName('head')
@@ -45,69 +44,61 @@ module.exports = {
         .setRequired(true)
     ),
 
+  async autocomplete(interaction) {
+    const focused = interaction.options.getFocused().toLowerCase();
+
+    const choices = Object.keys(iconMap)
+      .filter(i => i.includes(focused))
+      .slice(0, 25)
+      .map(i => ({ name: i, value: i }));
+
+    await interaction.respond(choices);
+  },
+
   async execute(interaction) {
     await interaction.deferReply();
 
-    const iconName = interaction.options.getString('icon')?.toLowerCase();
+    const icon = interaction.options.getString('icon');
     const head = interaction.options.getString('head');
     const text = interaction.options.getString('text');
 
-    const fileName = textures[iconName] || fallback;
+    const apiUrl =
+      `https://minecraftskinstealer.com/achievement/2/${encodeURIComponent(head)}/${encodeURIComponent(text)}`;
 
-    // FIXED PATH (Render-safe)
-    const iconPath = path.join(process.cwd(), "textures", fileName);
+    const baseImage = await loadImage(apiUrl);
 
-    // CHECK FILE EXISTS (prevents crash)
-    if (!fs.existsSync(iconPath)) {
-      return interaction.editReply({
-        content: `❌ Missing texture: ${fileName}`
-      });
-    }
+    const iconUrl = iconMap[icon] || iconMap.stone;
+    const iconImage = await loadImage(iconUrl);
 
-    let icon;
-    try {
-      icon = await loadImage(iconPath);
-    } catch (err) {
-      return interaction.editReply({
-        content: "❌ Failed to load image"
-      });
-    }
-
-    // CANVAS
-    const canvas = createCanvas(420, 90);
+    const canvas = createCanvas(baseImage.width, baseImage.height);
     const ctx = canvas.getContext('2d');
 
-    // background (Minecraft style)
-    ctx.fillStyle = "#2b2b2b";
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-    // border
-    ctx.strokeStyle = "#000000";
-    ctx.lineWidth = 4;
-    ctx.strokeRect(0, 0, canvas.width, canvas.height);
-
-    // icon
-    ctx.drawImage(icon, 10, 15, 60, 60);
-
-    // text styling (Minecraft-ish)
-    ctx.fillStyle = "#ffffff";
-    ctx.font = "bold 18px sans-serif";
-    ctx.fillText("Achievement Get!", 85, 30);
-
-    ctx.fillStyle = "#ffd700";
-    ctx.font = "bold 16px sans-serif";
-    ctx.fillText(head, 85, 55);
-
-    ctx.fillStyle = "#ffffff";
-    ctx.font = "14px sans-serif";
-    ctx.fillText(text, 85, 75);
+    ctx.drawImage(baseImage, 0, 0);
+    ctx.drawImage(iconImage, 16, 16, 48, 48);
 
     const attachment = new AttachmentBuilder(canvas.toBuffer(), {
-      name: "achievement.png",
+      name: 'achievement.png'
     });
 
-    return interaction.editReply({
-      files: [attachment],
+    // ✅ FULL EMBED (CORRECTED)
+    const embed = new EmbedBuilder()
+      .setTitle('🏆 Minecraft Achievement')
+      .setDescription('Custom achievement unlocked!')
+      .setColor(0xffaa00)
+      .setImage('attachment://achievement.png')
+      .setFooter({ text: `${head}` });
+
+    const row = new ActionRowBuilder().addComponents(
+      new ButtonBuilder()
+        .setLabel('Download Achievement')
+        .setStyle(ButtonStyle.Link)
+        .setURL(apiUrl)
+    );
+
+    await interaction.editReply({
+      embeds: [embed],
+      components: [row],
+      files: [attachment]
     });
-  },
+  }
 };
