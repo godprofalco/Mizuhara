@@ -90,7 +90,7 @@ module.exports = {
       return interaction.editReply("❌ Failed to load achievement background.");
     }
 
-    // ================= ICON LOAD =================
+    // ================= LOCAL ICON =================
     const iconFile = iconMap[icon] || "stone.png";
     const iconPath = path.join(process.cwd(), "textures", iconFile);
 
@@ -105,30 +105,31 @@ module.exports = {
       return interaction.editReply("❌ Failed to load icon image.");
     }
 
-    // ================= CANVAS (FIXED TRANSPARENCY) =================
+    // ================= CANVAS =================
     const canvas = createCanvas(baseImage.width, baseImage.height);
     const ctx = canvas.getContext("2d", { alpha: true });
 
-    // IMPORTANT: DO NOT add white background
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-    // draw API background first
+    // draw API image (background + text)
     ctx.drawImage(baseImage, 0, 0);
 
-    // ================= FIX ICON SLOT OVERLAP =================
-    // cover default icon area (removes diamond/stone/etc)
-    ctx.fillStyle = "#c6c6c6";
-    ctx.fillRect(6, 6, 60, 60);
+    // ================= MODERN CLEAN SLOT =================
+    const slotX = 7;
+    const slotY = 7;
+    const slotSize = 26;
 
-    ctx.strokeStyle = "#3a3a3a";
-    ctx.strokeRect(6, 6, 60, 60);
+    const iconSize = 22; // 🔥 modern clean size
 
-    // ================= ICON ALIGNMENT (PIXEL PERFECT) =================
-    const iconSize = 48;
-    const iconX = 12;
-    const iconY = 12;
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(slotX, slotY, slotSize, slotSize);
+    ctx.clip();
+
+    const iconX = slotX + Math.floor((slotSize - iconSize) / 2);
+    const iconY = slotY + Math.floor((slotSize - iconSize) / 2) - 1;
 
     ctx.drawImage(iconImage, iconX, iconY, iconSize, iconSize);
+
+    ctx.restore();
 
     // ================= OUTPUT =================
     const buffer = canvas.toBuffer("image/png");
@@ -144,7 +145,7 @@ module.exports = {
       .setColor(0xffaa00)
       .setImage("attachment://achievement.png");
 
-    // ================= DOWNLOAD BUTTON =================
+    // ================= BUTTON =================
     const row = new ActionRowBuilder().addComponents(
       new ButtonBuilder()
         .setLabel("Download Achievement")
