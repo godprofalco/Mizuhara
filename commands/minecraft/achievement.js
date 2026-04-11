@@ -24,17 +24,6 @@ const iconMap = {
   chest: "chest.png",
   furnace: "furnace.png",
   crafting_table: "crafting_table.png",
-
-  creeper_head: "creeper_head.png",
-  skeleton_skull: "skeleton_skull.png",
-  wither_skeleton_skull: "wither_skeleton_skull.png",
-  zombie_head: "zombie_head.png",
-  dragon_head: "dragon_head.png",
-
-  blaze_rod: "blaze_rod.png",
-  blaze_powder: "blaze_powder.png",
-  ghast_tear: "ghast_tear.png",
-  ender_pearl: "ender_pearl.png",
   nether_star: "nether_star.png"
 };
 
@@ -59,7 +48,6 @@ module.exports = {
         .setRequired(true)
     ),
 
-  // ================= AUTOCOMPLETE =================
   async autocomplete(interaction) {
     const focused = interaction.options.getFocused().toLowerCase();
 
@@ -71,7 +59,6 @@ module.exports = {
     return interaction.respond(choices).catch(() => {});
   },
 
-  // ================= MAIN =================
   async execute(interaction) {
     await interaction.deferReply().catch(() => {});
 
@@ -87,49 +74,54 @@ module.exports = {
     try {
       baseImage = await loadImage(apiUrl);
     } catch {
-      return interaction.editReply("❌ Failed to load achievement background.");
+      return interaction.editReply("❌ Failed to load achievement.");
     }
 
-    // ================= LOCAL ICON =================
+    // ================= ICON LOAD =================
     const iconFile = iconMap[icon] || "stone.png";
     const iconPath = path.join(process.cwd(), "textures", iconFile);
 
     if (!fs.existsSync(iconPath)) {
-      return interaction.editReply("❌ Icon file missing in textures folder.");
+      return interaction.editReply("❌ Icon file missing.");
     }
 
-    let iconImage;
-    try {
-      iconImage = await loadImage(iconPath);
-    } catch {
-      return interaction.editReply("❌ Failed to load icon image.");
-    }
+    const iconImage = await loadImage(iconPath);
 
     // ================= CANVAS =================
     const canvas = createCanvas(baseImage.width, baseImage.height);
-    const ctx = canvas.getContext("2d", { alpha: true });
+    const ctx = canvas.getContext("2d");
 
-    // draw API image (background + text)
     ctx.drawImage(baseImage, 0, 0);
 
-    // ================= MODERN CLEAN SLOT =================
-    const slotX = 7;
-    const slotY = 7;
-    const slotSize = 26;
+    // ================= FORCE BLANK SLOT (ERASE API ICON) =================
+    const slotX = 6;
+    const slotY = 6;
+    const slotSize = 60;
 
-    const iconSize = 22; // 🔥 modern clean size
+    ctx.fillStyle = "#c6c6c6"; // Minecraft UI grey
+    ctx.fillRect(slotX, slotY, slotSize, slotSize);
 
-    ctx.save();
-    ctx.beginPath();
-    ctx.rect(slotX, slotY, slotSize, slotSize);
-    ctx.clip();
+    ctx.strokeStyle = "#3a3a3a";
+    ctx.strokeRect(slotX, slotY, slotSize, slotSize);
 
-    const iconX = slotX + Math.floor((slotSize - iconSize) / 2);
-    const iconY = slotY + Math.floor((slotSize - iconSize) / 2) - 1;
+    // ================= ICON (RESTORED ORIGINAL SIZE) =================
+    const iconSize = 44; // original Minecraft feel (not too small)
+
+    const iconX = slotX + (slotSize - iconSize) / 2;
+    const iconY = slotY + (slotSize - iconSize) / 2;
 
     ctx.drawImage(iconImage, iconX, iconY, iconSize, iconSize);
 
-    ctx.restore();
+    // ================= TEXT SHIFT RIGHT (NO COLLISION) =================
+    const textStartX = 80;
+
+    ctx.fillStyle = "#ffffff";
+    ctx.font = "bold 16px sans-serif";
+    ctx.fillText(head, textStartX, 26);
+
+    ctx.fillStyle = "#dddddd";
+    ctx.font = "12px sans-serif";
+    ctx.fillText(text, textStartX, 46);
 
     // ================= OUTPUT =================
     const buffer = canvas.toBuffer("image/png");
@@ -138,14 +130,11 @@ module.exports = {
       name: "achievement.png"
     });
 
-    // ================= EMBED =================
     const embed = new EmbedBuilder()
       .setTitle("🏆 Minecraft Achievement")
-      .setDescription("Custom achievement unlocked!")
-      .setColor(0xffaa00)
-      .setImage("attachment://achievement.png");
+      .setImage("attachment://achievement.png")
+      .setColor(0xffaa00);
 
-    // ================= BUTTON =================
     const row = new ActionRowBuilder().addComponents(
       new ButtonBuilder()
         .setLabel("Download Achievement")
