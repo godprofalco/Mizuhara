@@ -14,7 +14,7 @@ require('dotenv').config();
 const {
   Client,
   GatewayIntentBits,
-  Collection
+  Collection,
 } = require('discord.js');
 
 const { LavalinkManager } = require('lavalink-client');
@@ -44,17 +44,20 @@ client.lavalink = new LavalinkManager({
     {
       authorization: process.env.LL_PASSWORD,
       host: process.env.LL_HOST,
-      port: parseInt(process.env.LL_PORT, 10),
+      port: Number(process.env.LL_PORT),
       id: process.env.LL_NAME,
     },
   ],
   sendToShard: (guildId, payload) =>
     client.guilds.cache.get(guildId)?.shard?.send(payload),
+
   autoSkip: true,
+
   client: {
     id: process.env.DISCORD_CLIENT_ID,
     username: 'Mizuhara',
   },
+
   playerOptions: {
     onEmptyQueue: {
       destroyAfterMs: 30000,
@@ -63,16 +66,19 @@ client.lavalink = new LavalinkManager({
   },
 });
 
-// ================= STYLES =================
+// ================= STYLES (FIXED CRASH HERE) =================
 
 global.styles = {
   successColor: chalk.bold.green,
   warningColor: chalk.bold.yellow,
   infoColor: chalk.bold.blue,
+  commandColor: chalk.bold.cyan,
   errorColor: chalk.red,
+  accentColor: chalk.bold.green,
+  secondaryColor: chalk.bold.white,
 };
 
-// ================= LOAD HANDLERS =================
+// ================= HANDLERS =================
 
 const handlerFiles = fs
   .readdirSync(path.join(__dirname, 'handlers'))
@@ -84,36 +90,36 @@ for (const file of handlerFiles) {
 }
 
 console.log(
-  global.styles.successColor(
-    `✅ Loaded ${handlerFiles.length} handlers`
-  )
+  global.styles.successColor(`✅ Loaded ${handlerFiles.length} handlers`)
 );
 
-// ================= LOAD COMMANDS (FIXED) =================
+// ================= COMMAND LOADER =================
 
 const commandFolders = fs.readdirSync(path.join(__dirname, 'commands'));
 
 for (const folder of commandFolders) {
+  const folderPath = path.join(__dirname, 'commands', folder);
+
+  if (!fs.lstatSync(folderPath).isDirectory()) continue;
+
   const commandFiles = fs
-    .readdirSync(path.join(__dirname, 'commands', folder))
+    .readdirSync(folderPath)
     .filter(f => f.endsWith('.js'));
 
   for (const file of commandFiles) {
-    const command = require(`./commands/${folder}/${file}`);
+    const command = require(path.join(folderPath, file));
 
-    if (command.data && command.data.name) {
+    if (command?.data?.name) {
       client.commands.set(command.data.name, command);
     }
   }
 }
 
 console.log(
-  global.styles.successColor(
-    `✅ Loaded ${client.commands.size} commands`
-  )
+  global.styles.successColor(`✅ Loaded ${client.commands.size} commands`)
 );
 
-// ================= INTERACTION HANDLER (FIXED) =================
+// ================= INTERACTION HANDLER =================
 
 client.on('interactionCreate', async (interaction) => {
   try {
@@ -121,22 +127,19 @@ client.on('interactionCreate', async (interaction) => {
 
     const command = client.commands.get(interaction.commandName);
 
-    if (!command) {
-      console.log('Unknown command:', interaction.commandName);
-      return;
-    }
+    if (!command) return;
 
     await command.execute(interaction, client);
 
   } catch (err) {
-    console.error('Interaction error:', err);
+    console.error(err);
 
-    if (interaction.replied || interaction.deferred) return;
-
-    await interaction.reply({
-      content: '❌ Command execution failed.',
-      ephemeral: true,
-    });
+    if (!interaction.replied && !interaction.deferred) {
+      await interaction.reply({
+        content: '❌ Command execution failed.',
+        ephemeral: true,
+      });
+    }
   }
 });
 
