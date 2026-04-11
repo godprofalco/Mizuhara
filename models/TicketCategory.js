@@ -1,8 +1,10 @@
 const mongoose = require('mongoose');
 
-module.exports = mongoose.model('TicketCategory', new mongoose.Schema({
+const TicketCategorySchema = new mongoose.Schema({
   guildId: String,
   name: String,
   description: String,
   emoji: String,
-}));
+});
+
+module.exports = mongoose.model('TicketCategory', TicketCategorySchema);
