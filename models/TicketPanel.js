@@ -1,16 +1,10 @@
 const mongoose = require('mongoose');
 
-const ticketPanelSchema = new mongoose.Schema({
+const TicketPanelSchema = new mongoose.Schema({
   guildId: String,
-
   title: String,
   description: String,
   footer: String,
-
-  supportRoleId: String,
-  categoryId: String,
-  logChannelId: String,
-
   dropdowns: [
     {
       name: String,
@@ -20,4 +14,4 @@ const ticketPanelSchema = new mongoose.Schema({
   ],
 });
 
-module.exports = mongoose.model('TicketPanel', ticketPanelSchema);
+module.exports = mongoose.model('TicketPanel', TicketPanelSchema);
