@@ -23,7 +23,6 @@ const iconMap = {
   tnt: "tnt.png",
   chest: "chest.png",
   furnace: "furnace.png",
-  crafting_table: "crafting_table.png",
   nether_star: "nether_star.png"
 };
 
@@ -66,7 +65,7 @@ module.exports = {
     const head = interaction.options.getString('head');
     const text = interaction.options.getString('text');
 
-    // ================= API BACKGROUND =================
+    // ================= API =================
     const apiUrl =
       `https://minecraftskinstealer.com/achievement/2/${encodeURIComponent(head)}/${encodeURIComponent(text)}`;
 
@@ -74,54 +73,61 @@ module.exports = {
     try {
       baseImage = await loadImage(apiUrl);
     } catch {
-      return interaction.editReply("❌ Failed to load achievement.");
+      return interaction.editReply("❌ Failed to load achievement API.");
     }
 
     // ================= ICON LOAD =================
-    const iconFile = iconMap[icon] || "stone.png";
-    const iconPath = path.join(process.cwd(), "textures", iconFile);
+    const iconPath = path.join(process.cwd(), "textures", iconMap[icon] || "stone.png");
 
     if (!fs.existsSync(iconPath)) {
-      return interaction.editReply("❌ Icon file missing.");
+      return interaction.editReply("❌ Icon missing in textures folder.");
     }
 
     const iconImage = await loadImage(iconPath);
 
-    // ================= CANVAS =================
-    const canvas = createCanvas(baseImage.width, baseImage.height);
+    // ================= CANVAS (FIXED SIZE FOR STABILITY) =================
+    const canvas = createCanvas(320, 64);
     const ctx = canvas.getContext("2d");
 
-    ctx.drawImage(baseImage, 0, 0);
+    ctx.drawImage(baseImage, 0, 0, 320, 64);
 
-    // ================= FORCE BLANK SLOT (ERASE API ICON) =================
-    const slotX = 6;
-    const slotY = 6;
-    const slotSize = 60;
+    // ================= HARD SLOT MASK (DESTROYS OLD ICON) =================
+    const slot = { x: 6, y: 6, size: 60 };
 
-    ctx.fillStyle = "#c6c6c6"; // Minecraft UI grey
-    ctx.fillRect(slotX, slotY, slotSize, slotSize);
+    ctx.fillStyle = "#7a7a7a";
+    ctx.fillRect(slot.x, slot.y, slot.size, slot.size);
 
-    ctx.strokeStyle = "#3a3a3a";
-    ctx.strokeRect(slotX, slotY, slotSize, slotSize);
+    ctx.fillStyle = "#9c9c9c";
+    ctx.fillRect(slot.x + 2, slot.y + 2, slot.size - 4, slot.size - 4);
 
-    // ================= ICON (RESTORED ORIGINAL SIZE) =================
-    const iconSize = 44; // original Minecraft feel (not too small)
+    ctx.strokeStyle = "#2b2b2b";
+    ctx.strokeRect(slot.x, slot.y, slot.size, slot.size);
 
-    const iconX = slotX + (slotSize - iconSize) / 2;
-    const iconY = slotY + (slotSize - iconSize) / 2;
+    // ================= ICON (CENTER PERFECT) =================
+    const iconSize = 34; // slightly better visual balance
 
+    const iconX = slot.x + (slot.size - iconSize) / 2;
+    const iconY = slot.y + (slot.size - iconSize) / 2;
+
+    ctx.imageSmoothingEnabled = false;
     ctx.drawImage(iconImage, iconX, iconY, iconSize, iconSize);
 
-    // ================= TEXT SHIFT RIGHT (NO COLLISION) =================
-    const textStartX = 80;
+    // ================= SAFE TEXT AREA =================
+    const textX = 80;
+    const textMaxWidth = 220;
 
     ctx.fillStyle = "#ffffff";
     ctx.font = "bold 16px sans-serif";
-    ctx.fillText(head, textStartX, 26);
+    ctx.fillText(head, textX, 26);
 
     ctx.fillStyle = "#dddddd";
     ctx.font = "12px sans-serif";
-    ctx.fillText(text, textStartX, 46);
+
+    // simple wrap protection
+    const shortText =
+      text.length > 40 ? text.slice(0, 40) + "..." : text;
+
+    ctx.fillText(shortText, textX, 46);
 
     // ================= OUTPUT =================
     const buffer = canvas.toBuffer("image/png");
