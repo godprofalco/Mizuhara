@@ -1,143 +1,83 @@
 const {
   SlashCommandBuilder,
-  EmbedBuilder,
   ActionRowBuilder,
   ButtonBuilder,
   ButtonStyle,
-  AttachmentBuilder
 } = require('discord.js');
-
-const { createCanvas, loadImage } = require('canvas');
-const path = require('path');
-const fs = require('fs');
-
-// ================= ICON MAP =================
-const iconMap = {
-  stone: "stone.png",
-  diamond: "diamond.png",
-  iron: "iron.png",
-  gold: "gold.png",
-  netherite: "netherite.png",
-  mace: "mace.png",
-  elytra: "elytra.png",
-  tnt: "tnt.png",
-  chest: "chest.png",
-  furnace: "furnace.png",
-  nether_star: "nether_star.png"
-};
 
 module.exports = {
   data: new SlashCommandBuilder()
     .setName('achievement')
-    .setDescription('Minecraft Achievement Generator')
-    .addStringOption(o =>
-      o.setName('icon')
-        .setDescription('Select icon')
+    .setDescription('Generate a Minecraft-style achievement')
+    .addStringOption((option) =>
+      option
+        .setName('icon')
+        .setDescription('Select an achievement icon for your Minecraft server.')
         .setRequired(true)
-        .setAutocomplete(true)
+        .addChoices(
+          { name: 'Grass', value: '1' },
+          { name: 'Diamond', value: '2' },
+          { name: 'Diamond Sword', value: '3' },
+          { name: 'Creeper', value: '4' },
+          { name: 'Pig', value: '5' },
+          { name: 'TNT', value: '6' },
+          { name: 'Cookie', value: '7' },
+          { name: 'Heart', value: '8' },
+          { name: 'Bed', value: '9' },
+          { name: 'Cake', value: '10' },
+          { name: 'Sign', value: '11' },
+          { name: 'Rail', value: '12' },
+          { name: 'Crafting Table', value: '13' },
+          { name: 'Redstone', value: '14' },
+          { name: 'Fire', value: '15' },
+          { name: 'Cobweb', value: '16' },
+          { name: 'Chest', value: '17' },
+          { name: 'Furnace', value: '18' },
+          { name: 'Book', value: '19' },
+          { name: 'Stone', value: '20' },
+          { name: 'Wooden Plank', value: '21' },
+          { name: 'Iron', value: '22' },
+          { name: 'Gold', value: '23' },
+          { name: 'Wooden Door', value: '24' },
+          { name: 'Iron Door', value: '25' }
+        )
     )
-    .addStringOption(o =>
-      o.setName('head')
-        .setDescription('Achievement title')
+    .addStringOption((option) =>
+      option
+        .setName('head')
+        .setDescription('Header for the achievement')
         .setRequired(true)
     )
-    .addStringOption(o =>
-      o.setName('text')
-        .setDescription('Achievement description')
+    .addStringOption((option) =>
+      option
+        .setName('text')
+        .setDescription('Body for the achievement')
         .setRequired(true)
     ),
 
-  async autocomplete(interaction) {
-    const focused = interaction.options.getFocused().toLowerCase();
-
-    const choices = Object.keys(iconMap)
-      .filter(i => i.includes(focused))
-      .slice(0, 25)
-      .map(i => ({ name: i, value: i }));
-
-    return interaction.respond(choices).catch(() => {});
-  },
-
   async execute(interaction) {
-    await interaction.deferReply().catch(() => {});
-
+    const achievementHead = interaction.options.getString('head');
+    const achievementText = interaction.options.getString('text');
     const icon = interaction.options.getString('icon');
-    const head = interaction.options.getString('head');
-    const text = interaction.options.getString('text');
+    const achievementUrl = `https://minecraftskinstealer.com/achievement/${encodeURIComponent(icon)}/${encodeURIComponent(achievementHead)}/${encodeURIComponent(achievementText)}`;
 
-    // ================= API =================
-    const apiUrl =
-      `https://minecraftskinstealer.com/achievement/2/${encodeURIComponent(head)}/${encodeURIComponent(text)}`;
-
-    let baseImage;
-    try {
-      baseImage = await loadImage(apiUrl);
-    } catch {
-      return interaction.editReply("❌ API failed.");
-    }
-
-    // ================= ICON =================
-    const iconPath = path.join(process.cwd(), "textures", iconMap[icon] || "stone.png");
-
-    if (!fs.existsSync(iconPath)) {
-      return interaction.editReply("❌ Icon missing.");
-    }
-
-    const iconImage = await loadImage(iconPath);
-
-    // ================= CANVAS =================
-    const canvas = createCanvas(baseImage.width, baseImage.height);
-    const ctx = canvas.getContext("2d");
-
-    // 🔥 STEP 1: draw API (text + UI stays)
-    ctx.drawImage(baseImage, 0, 0);
-
-    // 🔥 STEP 2: FORCE HIDE default icon
-    const slotX = 6;
-    const slotY = 6;
-    const slotSize = 60;
-
-    ctx.fillStyle = "#7a7a7a";
-    ctx.fillRect(slotX, slotY, slotSize, slotSize);
-
-    ctx.fillStyle = "#9c9c9c";
-    ctx.fillRect(slotX + 2, slotY + 2, slotSize - 4, slotSize - 4);
-
-    ctx.strokeStyle = "#2b2b2b";
-    ctx.strokeRect(slotX, slotY, slotSize, slotSize);
-
-    // 🔥 STEP 3: paste YOUR icon
-    const iconSize = 34;
-
-    const iconX = slotX + (slotSize - iconSize) / 2;
-    const iconY = slotY + (slotSize - iconSize) / 2;
-
-    ctx.imageSmoothingEnabled = false;
-    ctx.drawImage(iconImage, iconX, iconY, iconSize, iconSize);
-
-    // ================= OUTPUT =================
-    const buffer = canvas.toBuffer("image/png");
-
-    const attachment = new AttachmentBuilder(buffer, {
-      name: "achievement.png"
-    });
-
-    const embed = new EmbedBuilder()
-      .setTitle("🏆 Minecraft Achievement")
-      .setImage("attachment://achievement.png")
-      .setColor(0xffaa00);
-
-    const row = new ActionRowBuilder().addComponents(
+    const downloadButton = new ActionRowBuilder().addComponents(
       new ButtonBuilder()
-        .setLabel("Download")
+        .setLabel('Download Achievement')
         .setStyle(ButtonStyle.Link)
-        .setURL(apiUrl)
+        .setURL(achievementUrl)
     );
 
-    return interaction.editReply({
-      embeds: [embed],
-      components: [row],
-      files: [attachment]
+    await interaction.reply({
+      embeds: [
+        {
+          title: `🏆 Minecraft Achievement`,
+          image: { url: achievementUrl },
+          color: 0xffaa00,
+          description: `Custom achievement unlocked!`,
+        },
+      ],
+      components: [downloadButton],
     });
-  }
+  },
 };
