@@ -1,8 +1,7 @@
 const { SlashCommandBuilder, AttachmentBuilder, EmbedBuilder } = require('discord.js');
-const { createCanvas, loadImage } = require('canvas');
+const { createCanvas, loadImage } = require('@napi-rs/canvas');
 const path = require('path');
 
-// ICON MAP (your new system)
 const textures = {
   stone: "stone.png",
   diamond: "diamond.png",
@@ -31,82 +30,76 @@ const textures = {
 module.exports = {
   data: new SlashCommandBuilder()
     .setName('achievement')
-    .setDescription('Minecraft Achievement (Canvas Style)')
+    .setDescription('Minecraft Achievement')
     .addStringOption(o =>
-      o.setName('icon')
-        .setDescription('Icon')
-        .setRequired(true)
-    )
+      o.setName('icon').setDescription('Icon').setRequired(true))
     .addStringOption(o =>
-      o.setName('head')
-        .setDescription('Title')
-        .setRequired(true)
-    )
+      o.setName('head').setDescription('Title').setRequired(true))
     .addStringOption(o =>
-      o.setName('text')
-        .setDescription('Description')
-        .setRequired(true)
-    ),
+      o.setName('text').setDescription('Description').setRequired(true)),
 
   async execute(interaction) {
+
+    // FIX: prevents Discord timeout crash
+    await interaction.deferReply();
+
     const iconName = interaction.options.getString('icon')?.toLowerCase();
     const head = interaction.options.getString('head');
     const text = interaction.options.getString('text');
 
-    // ===== CANVAS =====
     const canvas = createCanvas(420, 90);
     const ctx = canvas.getContext('2d');
 
-    // Minecraft-style dark background
-    ctx.fillStyle = '#1f1f1f';
+    // BACKGROUND (Minecraft style)
+    ctx.fillStyle = "#1c1c1c";
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-    // Minecraft border (old achievement feel)
-    ctx.strokeStyle = '#555';
+    // BORDER (old achievement look)
+    ctx.strokeStyle = "#555";
     ctx.lineWidth = 2;
     ctx.strokeRect(1, 1, canvas.width - 2, canvas.height - 2);
 
-    // left icon background panel (classic look)
-    ctx.fillStyle = '#2b2b2b';
-    ctx.fillRect(5, 10, 70, 70);
+    // ICON BOX
+    ctx.fillStyle = "#2a2a2a";
+    ctx.fillRect(6, 12, 66, 66);
 
-    // icon load
+    // FIXED PATH (Render safe)
     const file = textures[iconName] || "stone.png";
-    const iconPath = path.resolve(__dirname, "../textures", file);
+    const iconPath = path.join(process.cwd(), "textures", file);
+    const fallbackPath = path.join(process.cwd(), "textures", "stone.png");
 
     let icon;
     try {
       icon = await loadImage(iconPath);
     } catch {
-      icon = await loadImage(path.resolve(__dirname, "../textures/stone.png"));
+      icon = await loadImage(fallbackPath);
     }
 
-    // draw icon (left side like old MC achievement)
-    ctx.drawImage(icon, 12, 17, 56, 56);
+    // ICON DRAW (left side)
+    ctx.drawImage(icon, 12, 18, 54, 54);
 
-    // ===== TEXT (Minecraft-style feel) =====
-    ctx.fillStyle = '#ffd700'; // yellow header
-    ctx.font = 'bold 16px Arial';
+    // TEXT STYLE (Minecraft feel)
+    ctx.fillStyle = "#ffd700";
+    ctx.font = "bold 15px Arial";
     ctx.fillText(head, 90, 35);
 
-    ctx.fillStyle = '#ffffff'; // white description
-    ctx.font = '14px Arial';
-    ctx.fillText(text, 90, 65);
+    ctx.fillStyle = "#ffffff";
+    ctx.font = "13px Arial";
+    ctx.fillText(text, 90, 62);
 
     const attachment = new AttachmentBuilder(canvas.toBuffer(), {
-      name: 'achievement.png',
+      name: "achievement.png"
     });
 
-    // ===== EMBED (your requested style) =====
     const embed = new EmbedBuilder()
-      .setTitle('🏆 Minecraft Achievement')
-      .setDescription('Custom achievement unlocked!')
+      .setTitle("🏆 Minecraft Achievement")
+      .setDescription("Custom achievement unlocked!")
       .setColor(0xffaa00)
-      .setImage('attachment://achievement.png');
+      .setImage("attachment://achievement.png");
 
-    await interaction.reply({
+    await interaction.editReply({
       embeds: [embed],
-      files: [attachment],
+      files: [attachment]
     });
-  },
+  }
 };
