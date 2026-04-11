@@ -6,26 +6,38 @@ app.get('/', (req, res) => {
 });
 
 app.listen(10000, () => {
-  console.log('✅ Express server running on http://localhost:10000');
+  console.log('✅ Express server running on port 10000');
 });
+
 require('dotenv').config();
-const { Client, GatewayIntentBits } = require('discord.js');
+
+const {
+  Client,
+  GatewayIntentBits,
+  Collection
+} = require('discord.js');
+
 const { LavalinkManager } = require('lavalink-client');
 const fs = require('fs');
 const path = require('path');
 const chalk = require('chalk');
 const { autoPlayFunction } = require('./functions/autoPlay');
 
+// ================= CLIENT =================
+
 const client = new Client({
   intents: [
     GatewayIntentBits.Guilds,
-    GatewayIntentBits.GuildPresences,
     GatewayIntentBits.GuildMessages,
     GatewayIntentBits.MessageContent,
     GatewayIntentBits.GuildMembers,
     GatewayIntentBits.GuildVoiceStates,
   ],
 });
+
+client.commands = new Collection();
+
+// ================= LAVALINK =================
 
 client.lavalink = new LavalinkManager({
   nodes: [
@@ -45,40 +57,89 @@ client.lavalink = new LavalinkManager({
   },
   playerOptions: {
     onEmptyQueue: {
-      destroyAfterMs: 30_000,
-      autoPlayFunction: autoPlayFunction,
+      destroyAfterMs: 30000,
+      autoPlayFunction,
     },
   },
 });
 
-const styles = {
+// ================= STYLES =================
+
+global.styles = {
   successColor: chalk.bold.green,
   warningColor: chalk.bold.yellow,
   infoColor: chalk.bold.blue,
-  commandColor: chalk.bold.cyan,
-  userColor: chalk.bold.magenta,
   errorColor: chalk.red,
-  highlightColor: chalk.bold.hex('#FFA500'),
-  accentColor: chalk.bold.hex('#00FF7F'),
-  secondaryColor: chalk.hex('#ADD8E6'),
-  primaryColor: chalk.bold.hex('#FF1493'),
-  dividerColor: chalk.hex('#FFD700'),
 };
 
-global.styles = styles;
+// ================= LOAD HANDLERS =================
 
 const handlerFiles = fs
   .readdirSync(path.join(__dirname, 'handlers'))
-  .filter((file) => file.endsWith('.js'));
-let counter = 0;
+  .filter(f => f.endsWith('.js'));
+
 for (const file of handlerFiles) {
-  counter += 1;
   const handler = require(`./handlers/${file}`);
-  if (typeof handler === 'function') {
-    handler(client);
+  if (typeof handler === 'function') handler(client);
+}
+
+console.log(
+  global.styles.successColor(
+    `✅ Loaded ${handlerFiles.length} handlers`
+  )
+);
+
+// ================= LOAD COMMANDS (FIXED) =================
+
+const commandFolders = fs.readdirSync(path.join(__dirname, 'commands'));
+
+for (const folder of commandFolders) {
+  const commandFiles = fs
+    .readdirSync(path.join(__dirname, 'commands', folder))
+    .filter(f => f.endsWith('.js'));
+
+  for (const file of commandFiles) {
+    const command = require(`./commands/${folder}/${file}`);
+
+    if (command.data && command.data.name) {
+      client.commands.set(command.data.name, command);
+    }
   }
 }
+
 console.log(
-  global.styles.successColor(`✅ Successfully loaded ${counter} handlers`)
+  global.styles.successColor(
+    `✅ Loaded ${client.commands.size} commands`
+  )
 );
+
+// ================= INTERACTION HANDLER (FIXED) =================
+
+client.on('interactionCreate', async (interaction) => {
+  try {
+    if (!interaction.isChatInputCommand()) return;
+
+    const command = client.commands.get(interaction.commandName);
+
+    if (!command) {
+      console.log('Unknown command:', interaction.commandName);
+      return;
+    }
+
+    await command.execute(interaction, client);
+
+  } catch (err) {
+    console.error('Interaction error:', err);
+
+    if (interaction.replied || interaction.deferred) return;
+
+    await interaction.reply({
+      content: '❌ Command execution failed.',
+      ephemeral: true,
+    });
+  }
+});
+
+// ================= LOGIN =================
+
 client.login(process.env.DISCORD_TOKEN);
