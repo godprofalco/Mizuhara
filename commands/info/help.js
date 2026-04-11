@@ -4,210 +4,266 @@ const {
   ActionRowBuilder,
   StringSelectMenuBuilder,
   ButtonBuilder,
-  ComponentType,
 } = require('discord.js');
-
 const Fuse = require('fuse.js');
 
 module.exports = {
   data: new SlashCommandBuilder()
     .setName('help')
-    .setDescription('Shows all commands')
-    .addStringOption(opt =>
-      opt.setName('command')
-        .setDescription('Get command info')
+    .setDescription('🌟 View all commands or get detailed help')
+
+    .addStringOption((option) =>
+      option
+        .setName('command')
+        .setDescription('🔍 Get info about a command')
         .setAutocomplete(true)
     )
-    .addStringOption(opt =>
-      opt.setName('search')
-        .setDescription('Search commands')
+
+    .addStringOption((option) =>
+      option
+        .setName('search')
+        .setDescription('⚡ Search commands')
     ),
 
   async autocomplete(interaction) {
-    const focused = interaction.options.getFocused();
-    const cmds = [...interaction.client.commands.keys()];
+    const focusedValue = interaction.options.getFocused().trim();
+    const commandNames = [...interaction.client.commands.keys()];
 
-    const filtered = cmds
-      .filter(c => c.startsWith(focused))
+    const filtered = commandNames
+      .filter((name) => name.startsWith(focusedValue))
       .slice(0, 10)
-      .map(c => ({ name: c, value: c }));
+      .map((name) => ({ name, value: name }));
 
-    return interaction.respond(filtered);
+    await interaction.respond(filtered);
   },
 
   async execute(interaction) {
     const { client } = interaction;
-
     const commandName = interaction.options.getString('command');
-    const search = interaction.options.getString('search');
+    const searchQuery = interaction.options.getString('search');
 
     const categoryMap = {
       admin: { name: 'Administration', emoji: '⚙️' },
-      moderation: { name: 'Moderation', emoji: '🔨' },
-      utility: { name: 'Utility', emoji: '🧰' },
-      fun: { name: 'Fun', emoji: '🎉' },
-      minecraft: { name: 'Minecraft', emoji: '🟩' },
-      info: { name: 'Info', emoji: 'ℹ️' },
+      fun: { name: 'Fun & Games', emoji: '🎉' },
+      level: { name: 'Leaderboard', emoji: '🎮' },
       music: { name: 'Music', emoji: '🎵' },
+      moderation: { name: 'Moderation', emoji: '🔨' },
+      utility: { name: 'Utility', emoji: '🪛' },
+      minecraft: { name: 'Minecraft', emoji: '🟩' },
+      info: { name: 'Information', emoji: 'ℹ️' },
+      tickets: { name: 'Tickets', emoji: '🎫' },
     };
 
     const baseEmbed = new EmbedBuilder()
       .setColor(0x5865f2)
       .setFooter({
-        text: `Requested by ${interaction.user.tag}`,
+        text: `🌸 Requested by ${interaction.user.tag}`,
         iconURL: interaction.user.displayAvatarURL(),
-      });
+      })
+      .setTimestamp();
 
-    // 🔎 SEARCH MODE
-    if (search) {
+    // ================= SEARCH =================
+    if (searchQuery) {
       const fuse = new Fuse([...client.commands.values()], {
         keys: ['data.name', 'data.description'],
         threshold: 0.4,
       });
 
-      const results = fuse.search(search);
+      const results = fuse.search(searchQuery);
 
       if (!results.length) {
         return interaction.reply({
-          content: `❌ No results for "${search}"`,
+          content: `❌ No commands found for "${searchQuery}"`,
           ephemeral: true,
         });
       }
 
       const embed = new EmbedBuilder()
         .setColor(0x5865f2)
-        .setTitle(`Search: ${search}`)
+        .setTitle(`🔎 Search Results`)
         .setDescription(
-          results.slice(0, 8).map((r, i) =>
-            `**${i + 1}.** \`/${r.item.data.name}\` - ${r.item.data.description || 'No desc'}`
-          ).join('\n')
-        );
+          results
+            .slice(0, 10)
+            .map(
+              (r, i) =>
+                `**${i + 1}.** \`/${r.item.data.name}\`\n🌸 ${r.item.data.description || 'No description'}`
+            )
+            .join('\n\n')
+        )
+        .setFooter({
+          text: `🌟 Found ${results.length} results`,
+        });
 
       return interaction.reply({ embeds: [embed] });
     }
 
-    // 📌 SINGLE COMMAND VIEW
+    // ================= SINGLE COMMAND =================
     if (commandName) {
-      const cmd = client.commands.get(commandName);
+      const command = client.commands.get(commandName);
 
-      if (!cmd) {
-        return interaction.reply({ content: 'Command not found', ephemeral: true });
+      if (!command) {
+        return interaction.reply({
+          content: '❌ Command not found!',
+          ephemeral: true,
+        });
       }
 
-      baseEmbed
-        .setTitle(`/${cmd.data.name}`)
-        .setDescription(cmd.data.description || 'No description')
+      const embed = baseEmbed
+        .setTitle(`🌟 /${command.data.name}`)
+        .setDescription(`🌸 ${command.data.description || 'No description'}`)
+
         .addFields({
-          name: 'Usage',
-          value: `\`/${cmd.data.name}\``
+          name: '⚡ Usage',
+          value:
+            `\`/${command.data.name}\`` +
+            (command.data.options?.length
+              ? ' ' +
+                command.data.options.map((opt) => `<${opt.name}>`).join(' ')
+              : ''),
         });
 
-      return interaction.reply({ embeds: [baseEmbed] });
+      if (command.data.options?.length) {
+        embed.addFields({
+          name: '🧩 Options',
+          value: command.data.options
+            .map(
+              (opt) =>
+                `• \`${opt.name}\` → ${opt.description || 'No description'}`
+            )
+            .join('\n'),
+        });
+      }
+
+      return interaction.reply({ embeds: [embed] });
     }
 
-    // 📁 CATEGORY BUILD
+    // ================= MAIN MENU =================
     const categories = {};
 
-    for (const cmd of client.commands.values()) {
-      const raw = cmd.category || 'other';
-      if (!categories[raw]) categories[raw] = [];
-      categories[raw].push(cmd);
-    }
+    client.commands.forEach((cmd) => {
+      const rawCategory = cmd.category || 'other';
 
-    const categoryKeys = Object.keys(categories);
+      const display = categoryMap[rawCategory] || {
+        name: rawCategory,
+        emoji: '📁',
+      };
 
-    const menu = new StringSelectMenuBuilder()
-      .setCustomId('help_category')
-      .setPlaceholder('Select category')
-      .addOptions(
-        categoryKeys.map(cat => {
-          const meta = categoryMap[cat] || { name: cat, emoji: '📁' };
+      const key = `${display.emoji} ${display.name}`;
 
-          return {
-            label: meta.name,
-            value: cat,
-            description: `${categories[cat].length} commands`,
-          };
-        })
-      );
-
-    const row = new ActionRowBuilder().addComponents(menu);
-
-    const embed = new EmbedBuilder()
-      .setColor(0x5865f2)
-      .setTitle('Help Menu')
-      .setDescription('Select a category below.')
-      .setThumbnail(client.user.displayAvatarURL());
-
-    const msg = await interaction.reply({
-      embeds: [embed],
-      components: [row],
-      fetchReply: true,
+      if (!categories[key]) categories[key] = [];
+      categories[key].push(cmd.data.name);
     });
 
-    let selected = categoryKeys[0];
-    let page = 0;
-    const PAGE_SIZE = 6;
+    const selectMenu = new StringSelectMenuBuilder()
+      .setCustomId('help-menu')
+      .setPlaceholder('🌟 Select a category')
+      .addOptions(
+        Object.keys(categories).map((category) => ({
+          label: category,
+          value: category,
+          description: `View ${category} commands`,
+        }))
+      );
 
-    const collector = msg.createMessageComponentCollector({
-      componentType: ComponentType.StringSelect,
+    const row = new ActionRowBuilder().addComponents(selectMenu);
+
+    const mainEmbed = baseEmbed
+      .setThumbnail(client.user.displayAvatarURL())
+      .setTitle('🌸 Help Menu')
+      .setDescription(
+        '✨ Select a category below to explore commands.\n\n' +
+        '🔍 Use `/help command:<name>` for details\n' +
+        '⚡ Use `/help search:<word>` to search'
+      )
+      .addFields(
+        Object.entries(categories).map(([cat, cmds]) => ({
+          name: `${cat}`,
+          value: `🌟 ${cmds.length} commands`,
+          inline: true,
+        }))
+      );
+
+    await interaction.reply({ embeds: [mainEmbed], components: [row] });
+
+    const filter = (i) =>
+      (i.customId === 'help-menu' ||
+        i.customId === 'prev' ||
+        i.customId === 'next') &&
+      i.user.id === interaction.user.id;
+
+    const collector = interaction.channel.createMessageComponentCollector({
+      filter,
       time: 60000,
     });
 
-    const update = async (i) => {
-      const cmds = categories[selected];
-      const pages = Math.ceil(cmds.length / PAGE_SIZE);
+    let page = 0;
+    let selectedCategory = Object.keys(categories)[0];
+    const PAGE_SIZE = 6;
 
-      const slice = cmds.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
+    async function update(i, category, pageNum) {
+      const cmds = categories[category];
+      const totalPages = Math.ceil(cmds.length / PAGE_SIZE);
 
-      const pageEmbed = new EmbedBuilder()
+      const current = cmds.slice(
+        pageNum * PAGE_SIZE,
+        (pageNum + 1) * PAGE_SIZE
+      );
+
+      const embed = new EmbedBuilder()
         .setColor(0x5865f2)
-        .setTitle(`📁 ${selected} (Page ${page + 1}/${pages})`)
+        .setTitle(`🖼️ ${category}`)
         .setDescription(
-          slice.map(c => `\`/${c.data.name}\` - ${c.data.description || 'No desc'}`).join('\n')
-        );
+          current
+            .map((c) => {
+              const cmd = client.commands.get(c);
+              return `> 🌸 \`/${c}\`\n⚡ ${cmd?.data?.description || 'No description'}`;
+            })
+            .join('\n\n')
+        )
+        .setFooter({
+          text: `📄 Page ${pageNum + 1}/${totalPages}`,
+        });
 
       const buttons = new ActionRowBuilder().addComponents(
         new ButtonBuilder()
           .setCustomId('prev')
-          .setLabel('Previous')
-          .setStyle(2)
-          .setDisabled(page === 0),
+          .setLabel('⬅️')
+          .setStyle('Secondary')
+          .setDisabled(pageNum === 0),
 
         new ButtonBuilder()
           .setCustomId('next')
-          .setLabel('Next')
-          .setStyle(2)
-          .setDisabled(page + 1 >= pages)
+          .setLabel('➡️')
+          .setStyle('Secondary')
+          .setDisabled(pageNum + 1 >= totalPages)
       );
 
-      await i.update({
-        embeds: [pageEmbed],
-        components: [row, buttons],
-      });
-    };
+      await i.update({ embeds: [embed], components: [row, buttons] });
+    }
 
     collector.on('collect', async (i) => {
-      if (i.customId === 'help_category') {
-        selected = i.values[0];
+      if (i.customId === 'help-menu') {
+        selectedCategory = i.values[0];
         page = 0;
-        return update(i);
-      }
-
-      if (i.customId === 'next') {
-        page++;
-        return update(i);
+        await update(i, selectedCategory, page);
       }
 
       if (i.customId === 'prev') {
         page--;
-        return update(i);
+        await update(i, selectedCategory, page);
+      }
+
+      if (i.customId === 'next') {
+        page++;
+        await update(i, selectedCategory, page);
       }
     });
 
     collector.on('end', async () => {
-      row.components[0].setDisabled(true);
-      await msg.edit({ components: [row] });
+      const disabled = selectMenu.setDisabled(true);
+      await interaction.editReply({
+        components: [new ActionRowBuilder().addComponents(disabled)],
+      });
     });
   },
 };
