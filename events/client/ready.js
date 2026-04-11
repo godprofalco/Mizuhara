@@ -1,4 +1,4 @@
-const { Events, ActivityType } = require('discord.js');
+const { Events } = require('discord.js');
 const startGiveawayScheduler = require('../../functions/giveawayScheduler');
 const serverStatusUpdater = require('../../functions/serverStatusUpdater');
 const updateStatus = require('../../functions/statusRotation');
@@ -12,65 +12,72 @@ module.exports = {
     startGiveawayScheduler(client);
     serverStatusUpdater(client);
     updateStatus(client);
+
     client.lavalink.init({ id: client.user.id });
     client.on('raw', (packet) => client.lavalink.sendRawData(packet));
+
     const commandFolderPath = path.join(__dirname, '../../commands');
+
     const categories = fs
       .readdirSync(commandFolderPath)
       .filter((file) =>
         fs.statSync(path.join(commandFolderPath, file)).isDirectory()
       );
 
-    let categoryText = `${global.styles.accentColor('📂 Categories:')}\n`;
+    // ✅ SAFE STYLE FALLBACKS
+    const style = (fn, fallback = (x) => x) =>
+      typeof fn === 'function' ? fn : fallback;
+
+    let categoryText = `${style(global.styles.accentColor)('📂 Categories:')}\n`;
+
     categories.forEach((category) => {
-      categoryText += `    ${global.styles.primaryColor('🔸')} ${global.styles.commandColor(category)}\n`;
+      categoryText += `    ${style(global.styles.primaryColor)('🔸')} ${style(global.styles.commandColor)(category)}\n`;
     });
 
     const startTime = new Date().toLocaleString();
-    const memoryUsage = (process.memoryUsage().heapUsed / 1024 / 1024).toFixed(
-      2
-    );
+    const memoryUsage = (process.memoryUsage().heapUsed / 1024 / 1024).toFixed(2);
     const serverCount = client.guilds.cache.size;
+
     const userCount = client.guilds.cache.reduce(
       (acc, guild) => acc + guild.memberCount,
       0
     );
 
-    const divider = global.styles.dividerColor(
+    const divider = style(global.styles.dividerColor)(
       '═══════════════════════════════════════════════════════════════'
     );
 
     console.log(`\n${divider}`);
 
     console.log(
-      `${global.styles.infoColor('🤖 Bot User       :')} ${global.styles.userColor(client.user.tag)}`
+      `${style(global.styles.infoColor)('🤖 Bot User       :')} ${style(global.styles.userColor)(client.user.tag)}`
     );
     console.log(
-      `${global.styles.infoColor('🌍 Servers        :')} ${global.styles.accentColor(serverCount)}`
+      `${style(global.styles.infoColor)('🌍 Servers        :')} ${style(global.styles.accentColor)(serverCount)}`
     );
     console.log(
-      `${global.styles.infoColor('👥 Total Users    :')} ${global.styles.successColor(userCount)}`
+      `${style(global.styles.infoColor)('👥 Total Users    :')} ${style(global.styles.successColor)(userCount)}`
     );
     console.log(
-      `${global.styles.infoColor('📡 Status         :')} ${global.styles.successColor('Online 🟢')}`
+      `${style(global.styles.infoColor)('📡 Status         :')} ${style(global.styles.successColor)('Online 🟢')}`
     );
     console.log(
-      `${global.styles.infoColor('⏰ Started At     :')} ${global.styles.secondaryColor(startTime)}`
+      `${style(global.styles.infoColor)('⏰ Started At     :')} ${style(global.styles.secondaryColor)(startTime)}`
     );
     console.log(
-      `${global.styles.infoColor('📦 Version        :')} ${global.styles.secondaryColor('v1.0.0')}`
+      `${style(global.styles.infoColor)('📦 Version        :')} ${style(global.styles.secondaryColor)('v1.0.0')}`
     );
     console.log(
-      `${global.styles.infoColor('🔧 Node.js        :')} ${global.styles.highlightColor(process.version)}`
+      `${style(global.styles.infoColor)('🔧 Node.js        :')} ${style(global.styles.highlightColor)(process.version)}`
     );
     console.log(
-      `${global.styles.infoColor('💾 Memory Usage   :')} ${global.styles.errorColor(`${memoryUsage} MB`)}\n`
+      `${style(global.styles.infoColor)('💾 Memory Usage   :')} ${style(global.styles.errorColor)(`${memoryUsage} MB`)}\n`
     );
 
     console.log(`${divider}`);
     console.log(`${categoryText}`);
     console.log(`${divider}`);
-    console.log(`${global.styles.successColor('\n🚀 Bot is ready! 🚀')}`);
+    console.log(`${style(global.styles.successColor)('\n🚀 Bot is ready! 🚀')}`);
     console.log(`${divider}\n`);
   },
 };
