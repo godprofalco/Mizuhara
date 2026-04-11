@@ -5,37 +5,49 @@ const {
   StringSelectMenuBuilder,
   PermissionFlagsBits,
 } = require('discord.js');
-
-const TicketPanel = require('../../models/TicketPanel');
+const TicketCategory = require('../../models/TicketCategory');
 
 module.exports = {
   data: new SlashCommandBuilder()
     .setName('createpanel')
     .setDescription('Create ticket panel')
     .setDefaultMemberPermissions(PermissionFlagsBits.Administrator)
-    .addChannelOption(o =>
-      o.setName('channel').setRequired(true)),
+    .addChannelOption(opt =>
+      opt.setName('channel').setDescription('Panel channel').setRequired(true)
+    ),
 
   async execute(interaction) {
-    const panel = await TicketPanel.findOne({ guildId: interaction.guild.id });
     const channel = interaction.options.getChannel('channel');
 
-    const embed = new EmbedBuilder()
-      .setTitle(panel.title)
-      .setDescription(panel.description)
-      .setFooter({ text: panel.footer })
-      .setColor('Blue');
+    const categories = await TicketCategory.find({
+      guildId: interaction.guild.id,
+    });
 
     const menu = new StringSelectMenuBuilder()
-      .setCustomId('ticket_open')
-      .setPlaceholder('Select ticket type')
-      .addOptions(panel.dropdowns);
+      .setCustomId('ticket_open_menu')
+      .setPlaceholder('🍁 Select Ticket Type')
+      .addOptions(
+        categories.map(c => ({
+          label: c.name,
+          value: c.name,
+          emoji: c.emoji,
+          description: c.description,
+        }))
+      );
+
+    const embed = new EmbedBuilder()
+      .setTitle('🌟 Ticket System')
+      .setDescription('Select a category to open a ticket')
+      .setColor('#FFD700');
 
     await channel.send({
       embeds: [embed],
       components: [new ActionRowBuilder().addComponents(menu)],
     });
 
-    interaction.reply({ content: 'Panel created!', ephemeral: true });
+    return interaction.reply({
+      content: '✅ Ticket panel created',
+      ephemeral: true,
+    });
   },
 };
