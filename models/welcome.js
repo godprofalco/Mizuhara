@@ -1,17 +1,22 @@
 const mongoose = require('mongoose');
 
 const welcomeSchema = new mongoose.Schema({
-  serverId: String,
+  serverId: { type: String, required: true, unique: true },
 
-  enabled: { type: Boolean, default: false },
   channelId: String,
 
-  type: { type: String, default: 'embed' },
+  title: { type: String, default: '🌸 Welcome!' },
+  description: { type: String, default: 'Welcome {mention} to {server} 🌟' },
+  footer: { type: String, default: 'Enjoy your stay ❄️' },
 
-  title: { type: String, default: 'Welcome {mention} 👋' },
-  description: { type: String, default: 'Welcome to {server}!' },
-  footer: { type: String, default: 'Member #{membercount}' },
-  color: { type: String, default: '#00BFFF' },
+  thumbnail: { type: Boolean, default: true },
+
+  imageMode: {
+    type: String,
+    default: 'user', // user | server | banner | url
+  },
+
+  imageURL: { type: String, default: null },
 });
 
 module.exports = mongoose.model('Welcome', welcomeSchema);
