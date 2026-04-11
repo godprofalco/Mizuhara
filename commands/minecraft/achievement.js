@@ -3,7 +3,7 @@ const {
   AttachmentBuilder,
 } = require('discord.js');
 
-const { createCanvas, loadImage } = require('@napi-rs/canvas');
+const { createCanvas, loadImage } = require('canvas');
 const path = require('path');
 
 // 🎯 ICON LIST
