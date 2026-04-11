@@ -1,28 +1,47 @@
-const { SlashCommandBuilder, PermissionFlagsBits } = require('discord.js');
+const {
+  SlashCommandBuilder,
+  EmbedBuilder,
+  PermissionFlagsBits,
+} = require('discord.js');
+
 const TicketPanel = require('../../models/TicketPanel');
 
 module.exports = {
   data: new SlashCommandBuilder()
     .setName('ticketsetup')
     .setDescription('Setup ticket system')
-    .setDefaultMemberPermissions(PermissionFlagsBits.Administrator)
-    .addStringOption(o => o.setName('title').setRequired(true))
-    .addStringOption(o => o.setName('description').setRequired(true))
-    .addStringOption(o => o.setName('footer').setRequired(true)),
+    .setDefaultMemberPermissions(PermissionFlagsBits.Administrator),
 
   async execute(interaction) {
+    if (!interaction.member.permissions.has(PermissionFlagsBits.Administrator)) {
+      return interaction.reply({
+        content: '❌ No permission',
+        ephemeral: true,
+      });
+    }
+
     await TicketPanel.findOneAndUpdate(
-      { guildId: interaction.guild.id },
+      { guildId: interaction.guildId },
       {
-        guildId: interaction.guild.id,
-        title: interaction.options.getString('title'),
-        description: interaction.options.getString('description'),
-        footer: interaction.options.getString('footer'),
-        dropdowns: [],
+        guildId: interaction.guildId,
+
+        title: '🎫 Tickets',
+        description: 'Select a category to open a ticket',
+        footer: 'Ticket System',
+
+        dropdowns: [
+          { name: 'Support', emoji: '🛠️', reasonRequired: true },
+          { name: 'Prices', emoji: '💰', reasonRequired: true },
+        ],
       },
-      { upsert: true }
+      { upsert: true, new: true }
     );
 
-    interaction.reply({ content: '✅ Setup saved!', ephemeral: true });
+    const embed = new EmbedBuilder()
+      .setTitle('✅ Ticket Setup Done')
+      .setDescription('Use /ticketpanel to send panel')
+      .setColor('Green');
+
+    return interaction.reply({ embeds: [embed], ephemeral: true });
   },
 };
