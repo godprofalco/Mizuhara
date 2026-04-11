@@ -1,42 +1,41 @@
-const {
-  SlashCommandBuilder,
-  AttachmentBuilder,
-} = require('discord.js');
-
+const { SlashCommandBuilder, AttachmentBuilder, EmbedBuilder } = require('discord.js');
 const { createCanvas, loadImage } = require('canvas');
 const path = require('path');
-const fs = require('fs');
 
-// 🎯 FULL ICON LIST (kept)
-const items = [
-  "stone","diamond","iron","gold","netherite","mace","end_crystal","elytra","tnt","chest","furnace","crafting_table",
-  "creeper_head","skeleton_skull","wither_skeleton_skull","zombie_head","dragon_head",
-  "blaze_rod","blaze_powder","ghast_tear","ender_pearl","nether_star"
-];
-
-// 🖼️ TEXTURES (unchanged, just complete)
+// ICON MAP (your new system)
 const textures = {
-  stone:"stone.png",diamond:"diamond.png",iron:"iron.png",gold:"gold.png",
-  netherite:"netherite.png",mace:"mace.png",end_crystal:"end_crystal.png",
-  elytra:"elytra.png",tnt:"tnt.png",chest:"chest.png",furnace:"furnace.png",
-  crafting_table:"crafting_table.png",
-  creeper_head:"creeper_head.png",skeleton_skull:"skeleton_skull.png",
-  wither_skeleton_skull:"wither_skeleton_skull.png",zombie_head:"zombie_head.png",
-  dragon_head:"dragon_head.png",
-  blaze_rod:"blaze_rod.png",blaze_powder:"blaze_powder.png",
-  ghast_tear:"ghast_tear.png",ender_pearl:"ender_pearl.png",
-  nether_star:"nether_star.png"
+  stone: "stone.png",
+  diamond: "diamond.png",
+  iron: "iron.png",
+  gold: "gold.png",
+  netherite: "netherite.png",
+  mace: "mace.png",
+  end_crystal: "end_crystal.png",
+  elytra: "elytra.png",
+  tnt: "tnt.png",
+  chest: "chest.png",
+  furnace: "furnace.png",
+  crafting_table: "crafting_table.png",
+  creeper_head: "creeper_head.png",
+  skeleton_skull: "skeleton_skull.png",
+  wither_skeleton_skull: "wither_skeleton_skull.png",
+  zombie_head: "zombie_head.png",
+  dragon_head: "dragon_head.png",
+  blaze_rod: "blaze_rod.png",
+  blaze_powder: "blaze_powder.png",
+  ghast_tear: "ghast_tear.png",
+  ender_pearl: "ender_pearl.png",
+  nether_star: "nether_star.png"
 };
 
 module.exports = {
   data: new SlashCommandBuilder()
     .setName('achievement')
-    .setDescription('Minecraft Achievement Generator')
+    .setDescription('Minecraft Achievement (Canvas Style)')
     .addStringOption(o =>
       o.setName('icon')
-        .setDescription('Select icon')
+        .setDescription('Icon')
         .setRequired(true)
-        .setAutocomplete(true)
     )
     .addStringOption(o =>
       o.setName('head')
@@ -49,62 +48,65 @@ module.exports = {
         .setRequired(true)
     ),
 
-  async autocomplete(interaction) {
-    const focused = interaction.options.getFocused().toLowerCase();
-    const filtered = items.filter(i => i.includes(focused)).slice(0, 25);
-
-    await interaction.respond(
-      filtered.map(i => ({
-        name: i.replace(/_/g, ' '),
-        value: i
-      }))
-    );
-  },
-
   async execute(interaction) {
-    await interaction.deferReply();
-
     const iconName = interaction.options.getString('icon')?.toLowerCase();
     const head = interaction.options.getString('head');
     const text = interaction.options.getString('text');
 
+    // ===== CANVAS =====
     const canvas = createCanvas(420, 90);
     const ctx = canvas.getContext('2d');
 
-    // ===== OLD STYLE BACKGROUND =====
-    ctx.fillStyle = "#2b2b2b";
+    // Minecraft-style dark background
+    ctx.fillStyle = '#1f1f1f';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-    ctx.strokeStyle = "#555";
-    ctx.strokeRect(0, 0, canvas.width, canvas.height);
+    // Minecraft border (old achievement feel)
+    ctx.strokeStyle = '#555';
+    ctx.lineWidth = 2;
+    ctx.strokeRect(1, 1, canvas.width - 2, canvas.height - 2);
 
-    // icon path (FIXED)
+    // left icon background panel (classic look)
+    ctx.fillStyle = '#2b2b2b';
+    ctx.fillRect(5, 10, 70, 70);
+
+    // icon load
     const file = textures[iconName] || "stone.png";
-    const iconPath = path.join(__dirname, "../../textures", file);
+    const iconPath = path.resolve(__dirname, "../textures", file);
 
     let icon;
     try {
-      if (!fs.existsSync(iconPath)) throw new Error();
       icon = await loadImage(iconPath);
     } catch {
-      icon = await loadImage(path.join(__dirname, "../../textures/stone.png"));
+      icon = await loadImage(path.resolve(__dirname, "../textures/stone.png"));
     }
 
-    ctx.drawImage(icon, 10, 15, 60, 60);
+    // draw icon (left side like old MC achievement)
+    ctx.drawImage(icon, 12, 17, 56, 56);
 
-    // ===== TEXT (OLD STYLE COLORS) =====
-    ctx.fillStyle = "#ffffff";
-    ctx.font = "bold 18px Arial";
-    ctx.fillText("Achievement Get!", 85, 30);
+    // ===== TEXT (Minecraft-style feel) =====
+    ctx.fillStyle = '#ffd700'; // yellow header
+    ctx.font = 'bold 16px Arial';
+    ctx.fillText(head, 90, 35);
 
-    ctx.font = "16px Arial";
-    ctx.fillText(head, 85, 55);
-    ctx.fillText(text, 85, 75);
+    ctx.fillStyle = '#ffffff'; // white description
+    ctx.font = '14px Arial';
+    ctx.fillText(text, 90, 65);
 
     const attachment = new AttachmentBuilder(canvas.toBuffer(), {
-      name: "achievement.png",
+      name: 'achievement.png',
     });
 
-    await interaction.editReply({ files: [attachment] });
+    // ===== EMBED (your requested style) =====
+    const embed = new EmbedBuilder()
+      .setTitle('🏆 Minecraft Achievement')
+      .setDescription('Custom achievement unlocked!')
+      .setColor(0xffaa00)
+      .setImage('attachment://achievement.png');
+
+    await interaction.reply({
+      embeds: [embed],
+      files: [attachment],
+    });
   },
 };
