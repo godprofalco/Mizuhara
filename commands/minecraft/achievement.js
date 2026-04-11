@@ -5,79 +5,149 @@ const {
   ButtonStyle,
 } = require('discord.js');
 
+// 🔥 ITEM LIST (you can expand anytime)
+const items = [
+  "grass",
+  "stone",
+  "cobblestone",
+  "diamond",
+  "iron_ingot",
+  "gold_ingot",
+  "netherite_ingot",
+  "diamond_sword",
+  "netherite_sword",
+  "bow",
+  "crossbow",
+  "shield",
+  "elytra",
+  "totem_of_undying",
+  "end_crystal",
+  "dragon_egg",
+  "beacon",
+  "trident",
+  "mace",
+  "apple",
+  "golden_apple",
+  "enchanted_golden_apple",
+  "tnt",
+  "redstone",
+  "hopper",
+  "chest",
+  "furnace",
+  "crafting_table",
+  "anvil",
+  "book",
+  "written_book"
+];
+
+// 🔥 SAFE ICON MAPPING (prevents API break)
+const iconMap = {
+  grass: 1,
+  stone: 20,
+  cobblestone: 20,
+  diamond: 2,
+  iron_ingot: 22,
+  gold_ingot: 23,
+  netherite_ingot: 742,
+  diamond_sword: 3,
+  netherite_sword: 743,
+  bow: 34,
+  crossbow: 358,
+  shield: 442,
+  elytra: 444,
+  totem_of_undying: 449,
+  end_crystal: 426,
+  dragon_egg: 122,
+  beacon: 138,
+  trident: 650,
+  apple: 260,
+  golden_apple: 322,
+  enchanted_golden_apple: 466,
+  tnt: 46,
+  redstone: 331,
+  hopper: 154,
+  chest: 54,
+  furnace: 61,
+  crafting_table: 58,
+  anvil: 145,
+  book: 340,
+  written_book: 387,
+
+  // ⚠️ NEW ITEM (MACE) — fallback safe icon
+  mace: 3
+};
+
 module.exports = {
   data: new SlashCommandBuilder()
     .setName('achievement')
     .setDescription('Generate a Minecraft-style achievement')
-    .addStringOption((option) =>
+
+    .addStringOption(option =>
       option
         .setName('icon')
-        .setDescription('Select an achievement icon for your Minecraft server.')
+        .setDescription('Choose item (diamond, elytra, mace, etc.)')
         .setRequired(true)
-        .addChoices(
-          { name: 'Grass', value: '1' },
-          { name: 'Diamond', value: '2' },
-          { name: 'Diamond Sword', value: '3' },
-          { name: 'Creeper', value: '4' },
-          { name: 'Pig', value: '5' },
-          { name: 'TNT', value: '6' },
-          { name: 'Cookie', value: '7' },
-          { name: 'Heart', value: '8' },
-          { name: 'Bed', value: '9' },
-          { name: 'Cake', value: '10' },
-          { name: 'Sign', value: '11' },
-          { name: 'Rail', value: '12' },
-          { name: 'Crafting Table', value: '13' },
-          { name: 'Redstone', value: '14' },
-          { name: 'Fire', value: '15' },
-          { name: 'Cobweb', value: '16' },
-          { name: 'Chest', value: '17' },
-          { name: 'Furnace', value: '18' },
-          { name: 'Book', value: '19' },
-          { name: 'Stone', value: '20' },
-          { name: 'Wooden Plank', value: '21' },
-          { name: 'Iron', value: '22' },
-          { name: 'Gold', value: '23' },
-          { name: 'Wooden Door', value: '24' },
-          { name: 'Iron Door', value: '25' }
-        )
+        .setAutocomplete(true)
     )
-    .addStringOption((option) =>
+
+    .addStringOption(option =>
       option
         .setName('head')
-        .setDescription('Header for the achievement')
+        .setDescription('Achievement title')
         .setRequired(true)
     )
-    .addStringOption((option) =>
+
+    .addStringOption(option =>
       option
         .setName('text')
-        .setDescription('Body for the achievement')
+        .setDescription('Achievement description')
         .setRequired(true)
     ),
 
-  async execute(interaction) {
-    const achievementHead = interaction.options.getString('head');
-    const achievementText = interaction.options.getString('text');
-    const icon = interaction.options.getString('icon');
-    const achievementUrl = `https://minecraftskinstealer.com/achievement/${encodeURIComponent(icon)}/${encodeURIComponent(achievementHead)}/${encodeURIComponent(achievementText)}`;
+  // 🔥 AUTOCOMPLETE
+  async autocomplete(interaction) {
+    const focused = interaction.options.getFocused().toLowerCase();
 
-    const downloadButton = new ActionRowBuilder().addComponents(
+    const filtered = items
+      .filter(item => item.includes(focused))
+      .slice(0, 25);
+
+    await interaction.respond(
+      filtered.map(item => ({
+        name: item.replace(/_/g, ' '),
+        value: item
+      }))
+    );
+  },
+
+  // 🔥 EXECUTE
+  async execute(interaction) {
+    const head = interaction.options.getString('head');
+    const text = interaction.options.getString('text');
+    const iconName = interaction.options.getString('icon').toLowerCase();
+
+    // 🔥 SAFE ICON RESOLVE
+    const iconId = iconMap[iconName] ?? iconMap.diamond_sword;
+
+    const url = `https://minecraftskinstealer.com/achievement/${encodeURIComponent(iconId)}/${encodeURIComponent(head)}/${encodeURIComponent(text)}`;
+
+    const row = new ActionRowBuilder().addComponents(
       new ButtonBuilder()
         .setLabel('Download Achievement')
         .setStyle(ButtonStyle.Link)
-        .setURL(achievementUrl)
+        .setURL(url)
     );
 
     await interaction.reply({
       embeds: [
         {
-          title: `🏆 Minecraft Achievement`,
-          image: { url: achievementUrl },
+          title: '🏆 Minecraft Achievement',
+          description: 'Custom achievement unlocked!',
+          image: { url },
           color: 0xffaa00,
-          description: `Custom achievement unlocked!`,
         },
       ],
-      components: [downloadButton],
+      components: [row],
     });
   },
 };
