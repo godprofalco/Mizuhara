@@ -5,61 +5,26 @@ const {
 
 const { createCanvas, loadImage } = require('canvas');
 const path = require('path');
+const fs = require('fs');
 
 // 🎯 ICON LIST
 const items = [
-  "stone",
-  "diamond",
-  "iron",
-  "gold",
-  "netherite",
-  "mace",
-  "end_crystal",
-  "elytra",
-  "tnt",
-  "chest",
-  "furnace",
-  "crafting_table",
-
-  "creeper_head",
-  "skeleton_skull",
-  "wither_skeleton_skull",
-  "zombie_head",
-  "dragon_head",
-
-  "blaze_rod",
-  "blaze_powder",
-  "ghast_tear",
-  "ender_pearl",
-  "nether_star"
+  "stone","diamond","iron","gold","netherite","mace","end_crystal","elytra","tnt","chest","furnace","crafting_table",
+  "creeper_head","skeleton_skull","wither_skeleton_skull","zombie_head","dragon_head",
+  "blaze_rod","blaze_powder","ghast_tear","ender_pearl","nether_star"
 ];
 
 // 🖼️ TEXTURE MAP
 const textures = {
-  stone: "stone.png",
-  diamond: "diamond.png",
-  iron: "iron.png",
-  gold: "gold.png",
-  netherite: "netherite.png",
-  mace: "mace.png",
-  end_crystal: "end_crystal.png",
-  elytra: "elytra.png",
-  tnt: "tnt.png",
-  chest: "chest.png",
-  furnace: "furnace.png",
-  crafting_table: "crafting_table.png",
-
-  creeper_head: "creeper_head.png",
-  skeleton_skull: "skeleton_skull.png",
-  wither_skeleton_skull: "wither_skeleton_skull.png",
-  zombie_head: "zombie_head.png",
-  dragon_head: "dragon_head.png",
-
-  blaze_rod: "blaze_rod.png",
-  blaze_powder: "blaze_powder.png",
-  ghast_tear: "ghast_tear.png",
-  ender_pearl: "ender_pearl.png",
-  nether_star: "nether_star.png"
+  stone:"stone.png",diamond:"diamond.png",iron:"iron.png",gold:"gold.png",
+  netherite:"netherite.png",mace:"mace.png",end_crystal:"end_crystal.png",
+  elytra:"elytra.png",tnt:"tnt.png",chest:"chest.png",furnace:"furnace.png",
+  crafting_table:"crafting_table.png",creeper_head:"creeper_head.png",
+  skeleton_skull:"skeleton_skull.png",wither_skeleton_skull:"wither_skeleton_skull.png",
+  zombie_head:"zombie_head.png",dragon_head:"dragon_head.png",
+  blaze_rod:"blaze_rod.png",blaze_powder:"blaze_powder.png",
+  ghast_tear:"ghast_tear.png",ender_pearl:"ender_pearl.png",
+  nether_star:"nether_star.png"
 };
 
 module.exports = {
@@ -67,28 +32,18 @@ module.exports = {
     .setName('achievement')
     .setDescription('Minecraft Achievement Generator')
     .addStringOption(o =>
-      o.setName('icon')
-        .setDescription('Select icon')
-        .setRequired(true)
-        .setAutocomplete(true)
+      o.setName('icon').setDescription('Select icon').setRequired(true).setAutocomplete(true)
     )
     .addStringOption(o =>
-      o.setName('head')
-        .setDescription('Title')
-        .setRequired(true)
+      o.setName('head').setDescription('Title').setRequired(true)
     )
     .addStringOption(o =>
-      o.setName('text')
-        .setDescription('Description')
-        .setRequired(true)
+      o.setName('text').setDescription('Description').setRequired(true)
     ),
 
   async autocomplete(interaction) {
     const focused = interaction.options.getFocused().toLowerCase();
-
-    const filtered = items
-      .filter(i => i.includes(focused))
-      .slice(0, 25);
+    const filtered = items.filter(i => i.includes(focused)).slice(0, 25);
 
     await interaction.respond(
       filtered.map(i => ({
@@ -99,6 +54,8 @@ module.exports = {
   },
 
   async execute(interaction) {
+    await interaction.deferReply(); // 🔥 FIX unknown interaction
+
     const iconName = interaction.options.getString('icon')?.toLowerCase();
     const head = interaction.options.getString('head');
     const text = interaction.options.getString('text');
@@ -106,28 +63,26 @@ module.exports = {
     const canvas = createCanvas(420, 90);
     const ctx = canvas.getContext('2d');
 
-    // background
     ctx.fillStyle = "#2b2b2b";
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
     ctx.strokeStyle = "#555";
     ctx.strokeRect(0, 0, canvas.width, canvas.height);
 
-    // safe icon resolve
+    // 🔥 FIX PATH (correct folder)
     const file = textures?.[iconName] || "stone.png";
-    const iconPath = path.resolve(__dirname, "../textures", file);
+    const iconPath = path.join(__dirname, "../../textures", file);
 
     let icon;
     try {
+      if (!fs.existsSync(iconPath)) throw new Error("Missing texture");
       icon = await loadImage(iconPath);
-    } catch (err) {
-      icon = await loadImage(path.resolve(__dirname, "../textures/stone.png"));
+    } catch {
+      icon = await loadImage(path.join(__dirname, "../../textures/stone.png"));
     }
 
-    // draw icon
     ctx.drawImage(icon, 10, 15, 60, 60);
 
-    // text
     ctx.fillStyle = "#ffffff";
     ctx.font = "bold 18px Arial";
     ctx.fillText("Achievement Get!", 85, 30);
@@ -140,6 +95,6 @@ module.exports = {
       name: "achievement.png",
     });
 
-    await interaction.reply({ files: [attachment] });
+    await interaction.editReply({ files: [attachment] });
   },
 };
