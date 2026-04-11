@@ -1,7 +1,6 @@
 const {
   SlashCommandBuilder,
   ChannelType,
-  EmbedBuilder,
 } = require('discord.js');
 
 const Welcome = require('../../models/welcome');
@@ -9,18 +8,28 @@ const Welcome = require('../../models/welcome');
 module.exports = {
   data: new SlashCommandBuilder()
     .setName('welcome')
-    .setDescription('Advanced welcome system')
+    .setDescription('Welcome system setup')
 
-    .addSubcommand(cmd =>
-      cmd.setName('toggle').setDescription('Enable/disable system')
+    .addSubcommand(c =>
+      c.setName('toggle')
+        .setDescription('Enable/Disable welcome system')
     )
 
-    .addSubcommand(cmd =>
-      cmd.setName('type')
+    .addSubcommand(c =>
+      c.setName('setchannel')
+        .setDescription('Set welcome channel')
+        .addChannelOption(o =>
+          o.setName('channel')
+            .addChannelTypes(ChannelType.GuildText)
+            .setRequired(true)
+        )
+    )
+
+    .addSubcommand(c =>
+      c.setName('type')
         .setDescription('Set message type')
-        .addStringOption(opt =>
-          opt.setName('type')
-            .setDescription('embed or text')
+        .addStringOption(o =>
+          o.setName('type')
             .setRequired(true)
             .addChoices(
               { name: 'Embed', value: 'embed' },
@@ -29,21 +38,11 @@ module.exports = {
         )
     )
 
-    .addSubcommand(cmd =>
-      cmd.setName('setchannel')
-        .setDescription('Set welcome channel')
-        .addChannelOption(opt =>
-          opt.setName('channel')
-            .addChannelTypes(ChannelType.GuildText)
-            .setRequired(true)
-        )
-    )
-
-    .addSubcommand(cmd =>
-      cmd.setName('set')
-        .setDescription('Edit welcome message')
-        .addStringOption(opt =>
-          opt.setName('field')
+    .addSubcommand(c =>
+      c.setName('set')
+        .setDescription('Edit message')
+        .addStringOption(o =>
+          o.setName('field')
             .setRequired(true)
             .addChoices(
               { name: 'title', value: 'title' },
@@ -52,14 +51,15 @@ module.exports = {
               { name: 'color', value: 'color' }
             )
         )
-        .addStringOption(opt =>
-          opt.setName('value')
+        .addStringOption(o =>
+          o.setName('value')
             .setRequired(true)
         )
     )
 
-    .addSubcommand(cmd =>
-      cmd.setName('test').setDescription('Preview message')
+    .addSubcommand(c =>
+      c.setName('test')
+        .setDescription('Test welcome message')
     ),
 
   async execute(interaction) {
@@ -67,7 +67,7 @@ module.exports = {
       return interaction.reply({ content: 'Admin only.', ephemeral: true });
     }
 
-    const { options, guild, user } = interaction;
+    const { guild, options, user } = interaction;
     const sub = options.getSubcommand();
 
     let data = await Welcome.findOne({ serverId: guild.id });
@@ -80,17 +80,7 @@ module.exports = {
     if (sub === 'toggle') {
       data.enabled = !data.enabled;
       await data.save();
-
-      return interaction.reply(`Welcome system is now **${data.enabled ? 'ON' : 'OFF'}**`);
-    }
-
-    // TYPE
-    if (sub === 'type') {
-      const type = options.getString('type');
-      data.type = type;
-      await data.save();
-
-      return interaction.reply(`Type set to **${type}**`);
+      return interaction.reply(`Welcome system: **${data.enabled ? 'ON' : 'OFF'}**`);
     }
 
     // CHANNEL
@@ -98,11 +88,17 @@ module.exports = {
       const ch = options.getChannel('channel');
       data.channelId = ch.id;
       await data.save();
-
       return interaction.reply(`Channel set to ${ch}`);
     }
 
-    // SET FIELD
+    // TYPE
+    if (sub === 'type') {
+      data.type = options.getString('type');
+      await data.save();
+      return interaction.reply(`Type set to **${data.type}**`);
+    }
+
+    // EDIT
     if (sub === 'set') {
       const field = options.getString('field');
       const value = options.getString('value');
@@ -115,33 +111,28 @@ module.exports = {
 
     // TEST
     if (sub === 'test') {
-      const replaced = (text) =>
+      const replace = (text) =>
         text
-          ?.replace(/{user}/g, user.username)
+          .replace(/{user}/g, user.username)
           .replace(/{mention}/g, `<@${user.id}>`)
-          .replace(/{tag}/g, user.tag)
-          .replace(/{id}/g, user.id)
           .replace(/{server}/g, guild.name)
           .replace(/{membercount}/g, guild.memberCount)
-          .replace(/{joindate}/g, `<t:${Math.floor(Date.now()/1000)}:F>`)
-          .replace(/{created}/g, `<t:${Math.floor(user.createdTimestamp/1000)}:R>`)
-          .replace(/{avatar}/g, user.displayAvatarURL());
+          .replace(/{created}/g, `<t:${Math.floor(user.createdTimestamp / 1000)}:R>`);
 
       if (data.type === 'text') {
         return interaction.reply({
-          content: replaced(data.description),
+          content: replace(data.description),
           ephemeral: true,
         });
       }
 
-      const embed = new EmbedBuilder()
-        .setTitle(replaced(data.title))
-        .setDescription(replaced(data.description))
-        .setFooter({ text: replaced(data.footer) })
-        .setColor(data.color || '#00BFFF');
-
       return interaction.reply({
-        embeds: [embed],
+        embeds: [{
+          title: replace(data.title),
+          description: replace(data.description),
+          footer: { text: replace(data.footer) },
+          color: parseInt(data.color.replace('#', ''), 16),
+        }],
         ephemeral: true,
       });
     }
