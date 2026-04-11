@@ -1,6 +1,5 @@
 const {
   SlashCommandBuilder,
-  EmbedBuilder,
   PermissionFlagsBits,
 } = require('discord.js');
 
@@ -9,30 +8,28 @@ const TicketPanel = require('../../models/TicketPanel');
 module.exports = {
   data: new SlashCommandBuilder()
     .setName('ticketsetup')
-    .setDescription('Setup ticket system')
+    .setDescription('Setup ticket panel')
     .setDefaultMemberPermissions(PermissionFlagsBits.Administrator),
 
   async execute(interaction) {
-    await TicketPanel.findOneAndUpdate(
+    const panel = await TicketPanel.findOneAndUpdate(
       { guildId: interaction.guildId },
       {
         guildId: interaction.guildId,
-        title: '🎫 Tickets',
-        description: 'Select a category to open a ticket',
-        footer: 'Ticket System',
+        title: '🎫 Ticket System',
+        description: 'Select an option below',
+        footer: 'Support System',
         dropdowns: [
-          { name: 'Support', emoji: '🛠️', reasonRequired: true },
-          { name: 'Prices', emoji: '💰', reasonRequired: true },
+          { name: 'Support', emoji: '🛠️', description: 'General help' },
+          { name: 'Shop', emoji: '💰', description: 'Buying issues' },
         ],
       },
       { upsert: true, new: true }
     );
 
-    const embed = new EmbedBuilder()
-      .setTitle('✅ Ticket Setup Complete')
-      .setDescription('Use /ticketpanel to send panel')
-      .setColor('Green');
-
-    return interaction.reply({ embeds: [embed], ephemeral: true });
+    return interaction.reply({
+      content: '✅ Ticket setup complete',
+      ephemeral: true,
+    });
   },
 };
