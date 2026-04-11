@@ -3,195 +3,147 @@ const {
   ChannelType,
   EmbedBuilder,
 } = require('discord.js');
+
 const Welcome = require('../../models/welcome');
 
 module.exports = {
   data: new SlashCommandBuilder()
     .setName('welcome')
-    .setDescription('Configure the welcome system')
-    .addSubcommand((subcommand) =>
-      subcommand
-        .setName('toggle')
-        .setDescription('Enable or disable the welcome system')
+    .setDescription('Advanced welcome system')
+
+    .addSubcommand(cmd =>
+      cmd.setName('toggle').setDescription('Enable/disable system')
     )
-    .addSubcommand((subcommand) =>
-      subcommand
-        .setName('description')
-        .setDescription('Set the custom welcome message description')
-    )
-    .addSubcommand((subcommand) =>
-      subcommand
-        .setName('setchannel')
-        .setDescription('Set the welcome channel')
-        .addChannelOption((option) =>
-          option
-            .setName('channel')
-            .setDescription('The channel to send welcome messages')
+
+    .addSubcommand(cmd =>
+      cmd.setName('type')
+        .setDescription('Set message type')
+        .addStringOption(opt =>
+          opt.setName('type')
+            .setDescription('embed or text')
             .setRequired(true)
-            .addChannelTypes(ChannelType.GuildText)
+            .addChoices(
+              { name: 'Embed', value: 'embed' },
+              { name: 'Text', value: 'text' }
+            )
         )
     )
-    .addSubcommand((subcommand) =>
-      subcommand
-        .setName('test')
-        .setDescription('Preview the current welcome message')
+
+    .addSubcommand(cmd =>
+      cmd.setName('setchannel')
+        .setDescription('Set welcome channel')
+        .addChannelOption(opt =>
+          opt.setName('channel')
+            .addChannelTypes(ChannelType.GuildText)
+            .setRequired(true)
+        )
+    )
+
+    .addSubcommand(cmd =>
+      cmd.setName('set')
+        .setDescription('Edit welcome message')
+        .addStringOption(opt =>
+          opt.setName('field')
+            .setRequired(true)
+            .addChoices(
+              { name: 'title', value: 'title' },
+              { name: 'description', value: 'description' },
+              { name: 'footer', value: 'footer' },
+              { name: 'color', value: 'color' }
+            )
+        )
+        .addStringOption(opt =>
+          opt.setName('value')
+            .setRequired(true)
+        )
+    )
+
+    .addSubcommand(cmd =>
+      cmd.setName('test').setDescription('Preview message')
     ),
 
   async execute(interaction) {
     if (!interaction.member.permissions.has('Administrator')) {
-      return interaction.reply({
-        content:
-          'You do not have the `Administrator` permission to manage the welcome system!',
-        ephemeral: true,
-      });
+      return interaction.reply({ content: 'Admin only.', ephemeral: true });
     }
+
     const { options, guild, user } = interaction;
-    const serverId = guild.id;
-    const subcommand = options.getSubcommand();
+    const sub = options.getSubcommand();
 
-    let welcome = await Welcome.findOne({ serverId });
+    let data = await Welcome.findOne({ serverId: guild.id });
 
-    if (!welcome) {
-      welcome = new Welcome({ serverId });
-      await welcome.save();
+    if (!data) {
+      data = await Welcome.create({ serverId: guild.id });
     }
 
-    if (subcommand === 'toggle') {
-      welcome.enabled = !welcome.enabled;
-      await welcome.save();
-      const toggleEmbed = new EmbedBuilder()
-        .setColor(welcome.enabled ? '#4CAF50' : '#FF5733')
-        .setTitle('Welcome System')
-        .setDescription(
-          `The welcome system is now ${welcome.enabled ? 'enabled' : 'disabled'}. \n\n __**Note:** Please set the channel for sending the welcome greetings by using \`/welcome setchannel\`__`
-        )
-        .setTimestamp();
-      return interaction.reply({ embeds: [toggleEmbed] });
+    // TOGGLE
+    if (sub === 'toggle') {
+      data.enabled = !data.enabled;
+      await data.save();
+
+      return interaction.reply(`Welcome system is now **${data.enabled ? 'ON' : 'OFF'}**`);
     }
 
-    if (subcommand === 'description') {
-      if (!welcome.enabled) {
+    // TYPE
+    if (sub === 'type') {
+      const type = options.getString('type');
+      data.type = type;
+      await data.save();
+
+      return interaction.reply(`Type set to **${type}**`);
+    }
+
+    // CHANNEL
+    if (sub === 'setchannel') {
+      const ch = options.getChannel('channel');
+      data.channelId = ch.id;
+      await data.save();
+
+      return interaction.reply(`Channel set to ${ch}`);
+    }
+
+    // SET FIELD
+    if (sub === 'set') {
+      const field = options.getString('field');
+      const value = options.getString('value');
+
+      data[field] = value;
+      await data.save();
+
+      return interaction.reply(`Updated **${field}**`);
+    }
+
+    // TEST
+    if (sub === 'test') {
+      const replaced = (text) =>
+        text
+          ?.replace(/{user}/g, user.username)
+          .replace(/{mention}/g, `<@${user.id}>`)
+          .replace(/{tag}/g, user.tag)
+          .replace(/{id}/g, user.id)
+          .replace(/{server}/g, guild.name)
+          .replace(/{membercount}/g, guild.memberCount)
+          .replace(/{joindate}/g, `<t:${Math.floor(Date.now()/1000)}:F>`)
+          .replace(/{created}/g, `<t:${Math.floor(user.createdTimestamp/1000)}:R>`)
+          .replace(/{avatar}/g, user.displayAvatarURL());
+
+      if (data.type === 'text') {
         return interaction.reply({
-          content: 'The Welcome System is not enabled in this server!',
-        });
-      }
-      const descriptionEmbed = new EmbedBuilder()
-        .setColor('#FFD700')
-        .setTitle('Set Custom Welcome Message')
-        .setDescription(
-          '**Please provide your custom welcome message. You can use the following placeholders:**\n\n' +
-            "`{member}` - Member's username\n" +
-            '`{server}` - Server name\n' +
-            '`{serverid}` - Server ID\n' +
-            '`{userid}` - User ID\n' +
-            '`{joindate}` - Join date\n' +
-            '`{accountage}` - Account age\n' +
-            '`{membercount}` - Member count\n' +
-            '`{serverage}` - Server age (in days)\n\n' +
-            '__**Note:** This command will expire in 5 minutes__'
-        )
-        .setTimestamp();
-
-      await interaction.reply({
-        embeds: [descriptionEmbed],
-        ephemeral: true,
-      });
-
-      const filter = (response) => response.author.id === user.id;
-      const collector = interaction.channel.createMessageCollector({
-        filter,
-        time: 300000,
-      });
-
-      collector.on('collect', async (message) => {
-        const customDescription = message.content;
-
-        welcome.description = customDescription;
-        await welcome.save();
-
-        const successEmbed = new EmbedBuilder()
-          .setColor('#4CAF50')
-          .setTitle('Custom Welcome Message Set')
-          .setDescription(
-            `Your welcome message has been updated to:\n${customDescription}`
-          )
-          .setTimestamp();
-        interaction.followUp({
-          embeds: [successEmbed],
+          content: replaced(data.description),
           ephemeral: true,
         });
-
-        collector.stop();
-      });
-
-      collector.on('end', (collected, reason) => {
-        if (reason === 'time') {
-          const timeoutEmbed = new EmbedBuilder()
-            .setColor('#FF5733')
-            .setTitle('Timeout')
-            .setDescription(
-              'You took too long to provide a description. Please try again.'
-            )
-            .setTimestamp();
-          interaction.followUp({
-            embeds: [timeoutEmbed],
-            ephemeral: true,
-          });
-        }
-      });
-    }
-
-    if (subcommand === 'setchannel') {
-      if (!welcome.enabled) {
-        return interaction.reply({
-          content: 'The Welcome System is not enabled in this server!',
-        });
       }
-      const channel = interaction.options.getChannel('channel');
 
-      welcome.channelId = channel.id;
-      await welcome.save();
+      const embed = new EmbedBuilder()
+        .setTitle(replaced(data.title))
+        .setDescription(replaced(data.description))
+        .setFooter({ text: replaced(data.footer) })
+        .setColor(data.color || '#00BFFF');
 
-      const channelEmbed = new EmbedBuilder()
-        .setColor('#4CAF50')
-        .setTitle('Welcome Channel Set')
-        .setDescription(`The welcome channel has been set to ${channel}.`)
-        .setTimestamp();
       return interaction.reply({
-        embeds: [channelEmbed],
+        embeds: [embed],
         ephemeral: true,
       });
-    }
-
-    if (subcommand === 'test') {
-      if (!welcome.enabled) {
-        return interaction.reply({
-          content: 'The Welcome System is not enabled in this server!',
-        });
-      }
-      const memberCount = guild.memberCount;
-
-      let description = welcome.description || 'Welcome {member} to {server}';
-      description = description
-        .replace(/{member}/g, interaction.user)
-        .replace(/{server}/g, guild.name)
-        .replace(/{serverid}/g, guild.id)
-        .replace(/{userid}/g, user.id)
-        .replace(/{joindate}/g, `<t:${Math.floor(Date.now() / 1000)}:F>`)
-        .replace(/{accountage}/g, `<t:${Math.floor(user.createdAt / 1000)}:R>`)
-        .replace(/{membercount}/g, memberCount)
-        .replace(/{serverage}/g, `<t:${Math.floor(guild.createdAt / 1000)}:R>`);
-
-      const testEmbed = new EmbedBuilder()
-        .setColor('#00BFFF')
-        .setTitle('Welcome Message Preview')
-        .setDescription(description)
-        .setFooter({
-          text: 'This is how the welcome message will look like when a member joins.',
-        })
-        .setTimestamp();
-
-      return interaction.reply({ embeds: [testEmbed], ephemeral: true });
     }
   },
 };
