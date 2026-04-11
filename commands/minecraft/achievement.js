@@ -8,19 +8,34 @@ const {
 } = require('discord.js');
 
 const { createCanvas, loadImage } = require('canvas');
+const fs = require('fs');
+const path = require('path');
 
-// ICON MAP (SAFE CDN)
+// ================= ICON MAP =================
 const iconMap = {
-  stone: "https://cdn.jsdelivr.net/gh/InventivetalentDev/minecraft-assets@1.20.4/assets/minecraft/textures/block/stone.png",
-  diamond: "https://cdn.jsdelivr.net/gh/InventivetalentDev/minecraft-assets@1.20.4/assets/minecraft/textures/item/diamond.png",
-  iron: "https://cdn.jsdelivr.net/gh/InventivetalentDev/minecraft-assets@1.20.4/assets/minecraft/textures/item/iron_ingot.png",
-  gold: "https://cdn.jsdelivr.net/gh/InventivetalentDev/minecraft-assets@1.20.4/assets/minecraft/textures/item/gold_ingot.png",
-  netherite: "https://cdn.jsdelivr.net/gh/InventivetalentDev/minecraft-assets@1.20.4/assets/minecraft/textures/item/netherite_ingot.png",
-  mace: "https://cdn.jsdelivr.net/gh/InventivetalentDev/minecraft-assets@1.20.4/assets/minecraft/textures/item/mace.png",
-  elytra: "https://cdn.jsdelivr.net/gh/InventivetalentDev/minecraft-assets@1.20.4/assets/minecraft/textures/item/elytra.png",
-  tnt: "https://cdn.jsdelivr.net/gh/InventivetalentDev/minecraft-assets@1.20.4/assets/minecraft/textures/block/tnt.png",
-  chest: "https://cdn.jsdelivr.net/gh/InventivetalentDev/minecraft-assets@1.20.4/assets/minecraft/textures/block/chest.png",
-  furnace: "https://cdn.jsdelivr.net/gh/InventivetalentDev/minecraft-assets@1.20.4/assets/minecraft/textures/block/furnace_front.png"
+  stone: "stone.png",
+  diamond: "diamond.png",
+  iron: "iron.png",
+  gold: "gold.png",
+  netherite: "netherite.png",
+  mace: "mace.png",
+  elytra: "elytra.png",
+  tnt: "tnt.png",
+  chest: "chest.png",
+  furnace: "furnace.png",
+  crafting_table: "crafting_table.png",
+
+  creeper_head: "creeper_head.png",
+  skeleton_skull: "skeleton_skull.png",
+  wither_skeleton_skull: "wither_skeleton_skull.png",
+  zombie_head: "zombie_head.png",
+  dragon_head: "dragon_head.png",
+
+  blaze_rod: "blaze_rod.png",
+  blaze_powder: "blaze_powder.png",
+  ghast_tear: "ghast_tear.png",
+  ender_pearl: "ender_pearl.png",
+  nether_star: "nether_star.png"
 };
 
 module.exports = {
@@ -29,22 +44,22 @@ module.exports = {
     .setDescription('Minecraft Achievement Generator')
     .addStringOption(o =>
       o.setName('icon')
-        .setDescription('Choose icon')
+        .setDescription('Select icon')
         .setRequired(true)
         .setAutocomplete(true)
     )
     .addStringOption(o =>
       o.setName('head')
-        .setDescription('Achievement title')
+        .setDescription('Title')
         .setRequired(true)
     )
     .addStringOption(o =>
       o.setName('text')
-        .setDescription('Achievement description')
+        .setDescription('Description')
         .setRequired(true)
     ),
 
-  // ✅ AUTOCOMPLETE FIXED
+  // ================= AUTOCOMPLETE =================
   async autocomplete(interaction) {
     const focused = interaction.options.getFocused().toLowerCase();
 
@@ -53,77 +68,77 @@ module.exports = {
       .slice(0, 25)
       .map(i => ({ name: i, value: i }));
 
-    await interaction.respond(choices);
+    return interaction.respond(choices).catch(() => {});
   },
 
+  // ================= MAIN =================
   async execute(interaction) {
-    // ✅ SAFE ACK (prevents 10062)
-    await interaction.deferReply().catch(() => {});
+    await interaction.deferReply().catch(() => null);
 
     const icon = interaction.options.getString('icon');
     const head = interaction.options.getString('head');
     const text = interaction.options.getString('text');
 
-    // ================= SAFE API =================
-    let baseImage;
     try {
-      const apiUrl =
-        `https://minecraftskinstealer.com/achievement/2/${encodeURIComponent(head)}/${encodeURIComponent(text)}`;
-      baseImage = await loadImage(apiUrl);
-    } catch (err) {
-      return interaction.editReply("❌ Minecraft API failed.");
-    }
+      // ================= LOAD API BACKGROUND =================
+      const apiUrl = `https://minecraftskinstealer.com/achievement/2/${encodeURIComponent(head)}/${encodeURIComponent(text)}`;
+      const baseImage = await loadImage(apiUrl);
 
-    // ================= ICON LOAD SAFE =================
-    let iconImage;
-    try {
-      iconImage = await loadImage(iconMap[icon] || iconMap.stone);
-    } catch (err) {
-      return interaction.editReply("❌ Icon failed to load.");
-    }
+      // ================= LOAD ICON (LOCAL SAFE) =================
+      const iconFile = iconMap[icon];
 
-    // ================= CANVAS =================
-    const canvas = createCanvas(baseImage.width, baseImage.height);
-    const ctx = canvas.getContext('2d');
+      if (!iconFile) {
+        return interaction.editReply("❌ Invalid icon selected.");
+      }
 
-    ctx.drawImage(baseImage, 0, 0);
+      const iconPath = path.join(process.cwd(), "textures", iconFile);
 
-    // icon placement (Minecraft style)
-    ctx.drawImage(iconImage, 16, 16, 48, 48);
+      if (!fs.existsSync(iconPath)) {
+        return interaction.editReply(`❌ Missing texture: ${iconFile}`);
+      }
 
-    const buffer = canvas.toBuffer('image/png');
+      const iconImage = await loadImage(iconPath);
 
-    const attachment = new AttachmentBuilder(buffer, {
-      name: 'achievement.png'
-    });
+      // ================= CANVAS =================
+      const canvas = createCanvas(baseImage.width, baseImage.height);
+      const ctx = canvas.getContext('2d');
 
-    // ================= EMBED (OLD STYLE CLEAN) =================
-    const embed = new EmbedBuilder()
-      .setTitle('🏆 Minecraft Achievement')
-      .setDescription('Custom achievement unlocked!')
-      .setColor(0xffaa00)
-      .setImage('attachment://achievement.png')
-      .setFooter({ text: `${head}` });
+      ctx.drawImage(baseImage, 0, 0);
 
-    // ================= BUTTON =================
-    const row = new ActionRowBuilder().addComponents(
-      new ButtonBuilder()
-        .setLabel('Download')
-        .setStyle(ButtonStyle.Link)
-        .setURL(
-          `https://minecraftskinstealer.com/achievement/2/${encodeURIComponent(head)}/${encodeURIComponent(text)}`
-        )
-    );
+      // icon position (Minecraft style)
+      ctx.drawImage(iconImage, 16, 16, 48, 48);
 
-    // ================= FINAL SAFE SEND =================
-    try {
-      await interaction.editReply({
+      const buffer = canvas.toBuffer('image/png');
+
+      const attachment = new AttachmentBuilder(buffer, {
+        name: 'achievement.png'
+      });
+
+      // ================= EMBED =================
+      const embed = new EmbedBuilder()
+        .setTitle('🏆 Minecraft Achievement')
+        .setDescription('Custom achievement unlocked!')
+        .setColor(0xffaa00)
+        .setImage('attachment://achievement.png');
+
+      // ================= BUTTON =================
+      const row = new ActionRowBuilder().addComponents(
+        new ButtonBuilder()
+          .setLabel('Download')
+          .setStyle(ButtonStyle.Link)
+          .setURL(apiUrl)
+      );
+
+      return interaction.editReply({
         embeds: [embed],
         components: [row],
         files: [attachment]
       });
+
     } catch (err) {
-      console.log(err);
+      console.error(err);
+
+      return interaction.editReply("❌ Failed to generate achievement.");
     }
   }
 };
