@@ -73,58 +73,70 @@ module.exports = {
 
   // ================= MAIN =================
   async execute(interaction) {
-    await interaction.deferReply().catch(() => null);
+    await interaction.deferReply().catch(() => {});
 
     const icon = interaction.options.getString('icon');
     const head = interaction.options.getString('head');
     const text = interaction.options.getString('text');
 
     try {
-      // ================= LOAD API BACKGROUND =================
+      // ================= BASE API IMAGE =================
       const apiUrl = `https://minecraftskinstealer.com/achievement/2/${encodeURIComponent(head)}/${encodeURIComponent(text)}`;
       const baseImage = await loadImage(apiUrl);
 
-      // ================= LOAD ICON (LOCAL SAFE) =================
-      const iconFile = iconMap[icon];
-
-      if (!iconFile) {
+      // ================= STRICT ICON LOAD (NO DUPLICATES) =================
+      if (!iconMap.hasOwnProperty(icon)) {
         return interaction.editReply("❌ Invalid icon selected.");
       }
 
-      const iconPath = path.join(process.cwd(), "textures", iconFile);
+      const iconPath = path.join(process.cwd(), "textures", iconMap[icon]);
 
       if (!fs.existsSync(iconPath)) {
-        return interaction.editReply(`❌ Missing texture: ${iconFile}`);
+        return interaction.editReply(`❌ Missing texture: ${iconMap[icon]}`);
       }
 
       const iconImage = await loadImage(iconPath);
 
       // ================= CANVAS =================
       const canvas = createCanvas(baseImage.width, baseImage.height);
-      const ctx = canvas.getContext('2d');
+      const ctx = canvas.getContext("2d");
 
       ctx.drawImage(baseImage, 0, 0);
 
-      // icon position (Minecraft style)
-      ctx.drawImage(iconImage, 16, 16, 48, 48);
+      // ================= ICON (ONLY ONCE - FIXED) =================
+      const iconSize = 48;
+      const iconX = 14;
+      const iconY = 14;
 
-      const buffer = canvas.toBuffer('image/png');
+      ctx.drawImage(iconImage, iconX, iconY, iconSize, iconSize);
+
+      // ================= TEXT LAYOUT (NO OVERLAP) =================
+      const textX = iconX + iconSize + 12;
+
+      ctx.fillStyle = "#FFFFFF";
+      ctx.font = "bold 16px sans-serif";
+      ctx.fillText(head, textX, 30);
+
+      ctx.font = "14px sans-serif";
+      ctx.fillText(text, textX, 55);
+
+      const buffer = canvas.toBuffer("image/png");
 
       const attachment = new AttachmentBuilder(buffer, {
-        name: 'achievement.png'
+        name: "achievement.png"
       });
 
       // ================= EMBED =================
       const embed = new EmbedBuilder()
-        .setTitle('🏆 Minecraft Achievement')
-        .setDescription('Custom achievement unlocked!')
+        .setTitle("🏆 Minecraft Achievement")
+        .setDescription("Custom achievement unlocked!")
         .setColor(0xffaa00)
-        .setImage('attachment://achievement.png');
+        .setImage("attachment://achievement.png");
 
       // ================= BUTTON =================
       const row = new ActionRowBuilder().addComponents(
         new ButtonBuilder()
-          .setLabel('Download')
+          .setLabel("Download")
           .setStyle(ButtonStyle.Link)
           .setURL(apiUrl)
       );
@@ -137,7 +149,6 @@ module.exports = {
 
     } catch (err) {
       console.error(err);
-
       return interaction.editReply("❌ Failed to generate achievement.");
     }
   }
