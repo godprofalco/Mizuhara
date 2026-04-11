@@ -4,260 +4,210 @@ const {
   ActionRowBuilder,
   StringSelectMenuBuilder,
   ButtonBuilder,
+  ComponentType,
 } = require('discord.js');
+
 const Fuse = require('fuse.js');
 
 module.exports = {
   data: new SlashCommandBuilder()
     .setName('help')
-    .setDescription(
-      'Displays a list of commands or detailed info about a specific command.'
-    )
-    .addStringOption((option) =>
-      option
-        .setName('command')
-        .setDescription('Get detailed info about a specific command')
+    .setDescription('Shows all commands')
+    .addStringOption(opt =>
+      opt.setName('command')
+        .setDescription('Get command info')
         .setAutocomplete(true)
     )
-    .addStringOption((option) =>
-      option
-        .setName('search')
-        .setDescription('Search for commands using keywords')
+    .addStringOption(opt =>
+      opt.setName('search')
+        .setDescription('Search commands')
     ),
 
   async autocomplete(interaction) {
-    const focusedValue = interaction.options.getFocused().trim();
-    const commandNames = [...interaction.client.commands.keys()];
+    const focused = interaction.options.getFocused();
+    const cmds = [...interaction.client.commands.keys()];
 
-    const filtered = commandNames
-      .filter((name) => name.startsWith(focusedValue))
+    const filtered = cmds
+      .filter(c => c.startsWith(focused))
       .slice(0, 10)
-      .map((name) => ({ name, value: name }));
+      .map(c => ({ name: c, value: c }));
 
-    await interaction.respond(filtered);
+    return interaction.respond(filtered);
   },
 
   async execute(interaction) {
     const { client } = interaction;
+
     const commandName = interaction.options.getString('command');
-    const searchQuery = interaction.options.getString('search');
-    // Custom category display names and emojis
+    const search = interaction.options.getString('search');
+
     const categoryMap = {
       admin: { name: 'Administration', emoji: '⚙️' },
-      fun: { name: 'Fun & Games', emoji: '🎉' },
-      level: { name: 'Leaderboard', emoji: '🎮' },
-      music: { name: 'Music', emoji: '🎵' },
       moderation: { name: 'Moderation', emoji: '🔨' },
-      utility: { name: 'Utility', emoji: '🪛' },
+      utility: { name: 'Utility', emoji: '🧰' },
+      fun: { name: 'Fun', emoji: '🎉' },
       minecraft: { name: 'Minecraft', emoji: '🟩' },
-      info: { name: 'Information', emoji: 'ℹ️' },
-      tickets: { name: 'Tickets', emoji: '🎫' },
+      info: { name: 'Info', emoji: 'ℹ️' },
+      music: { name: 'Music', emoji: '🎵' },
     };
-    const helpEmbed = new EmbedBuilder()
+
+    const baseEmbed = new EmbedBuilder()
       .setColor(0x5865f2)
       .setFooter({
         text: `Requested by ${interaction.user.tag}`,
         iconURL: interaction.user.displayAvatarURL(),
-      })
-      .setTimestamp();
+      });
 
-    // Fuzzy search logic
-    if (searchQuery) {
+    // 🔎 SEARCH MODE
+    if (search) {
       const fuse = new Fuse([...client.commands.values()], {
         keys: ['data.name', 'data.description'],
         threshold: 0.4,
       });
-      const results = fuse.search(searchQuery);
+
+      const results = fuse.search(search);
+
       if (!results.length) {
         return interaction.reply({
-          content: `❌ No commands found matching "${searchQuery}".`,
+          content: `❌ No results for "${search}"`,
           ephemeral: true,
         });
       }
+
       const embed = new EmbedBuilder()
         .setColor(0x5865f2)
-        .setTitle(`🔎 Search Results for "${searchQuery}"`)
+        .setTitle(`Search: ${search}`)
         .setDescription(
-          results
-            .slice(0, 10)
-            .map(
-              (r, i) =>
-                `**${i + 1}.** \`/${r.item.data.name}\` - ${r.item.data.description || 'No description.'}`
-            )
-            .join('\n')
-        )
-        .setFooter({
-          text: `Requested by ${interaction.user.tag}`,
-          iconURL: interaction.user.displayAvatarURL(),
-        })
-        .setTimestamp();
+          results.slice(0, 8).map((r, i) =>
+            `**${i + 1}.** \`/${r.item.data.name}\` - ${r.item.data.description || 'No desc'}`
+          ).join('\n')
+        );
+
       return interaction.reply({ embeds: [embed] });
     }
 
+    // 📌 SINGLE COMMAND VIEW
     if (commandName) {
-      const command = client.commands.get(commandName);
-      if (!command) {
-        return interaction.reply({
-          content: '❌ Command not found!',
-          ephemeral: true,
-        });
-      }
-      helpEmbed
-        .setTitle(`🔍 Command: **/${command.data.name}**`)
-        .setDescription(command.data.description || 'No description available.')
-        .addFields(
-          {
-            name: '🛠️ Usage',
-            value:
-              `\`/${command.data.name}\`` +
-              (command.data.options?.length
-                ? ' ' +
-                  command.data.options.map((opt) => `<${opt.name}>`).join(' ')
-                : ''),
-          },
-          {
-            name: 'ℹ️ Details',
-            value: `${command.data.description}`,
-          },
-          ...(command.data.options?.length
-            ? [
-                {
-                  name: 'Options',
-                  value: command.data.options
-                    .map(
-                      (opt) =>
-                        `• \`${opt.name}\`: ${opt.description || 'No description.'}`
-                    )
-                    .join('\n'),
-                },
-              ]
-            : [])
-        );
-      return interaction.reply({ embeds: [helpEmbed] });
-    } else {
-      const categories = {};
-      client.commands.forEach((cmd) => {
-        const rawCategory = cmd.category || 'Uncategorized';
-        const display = categoryMap[rawCategory] || {
-          name: rawCategory,
-          emoji: '📁',
-        };
-        const key = `${display.emoji} ${display.name}`;
-        if (!categories[key]) categories[key] = [];
-        categories[key].push(cmd.data.name);
-      });
+      const cmd = client.commands.get(commandName);
 
-      const selectMenu = new StringSelectMenuBuilder()
-        .setCustomId('help-menu')
-        .setPlaceholder('Choose a category')
-        .addOptions(
-          Object.keys(categories).map((category) => ({
-            label: category,
-            value: category,
-            description: `Commands under ${category}`,
-          }))
-        );
-
-      const row = new ActionRowBuilder().addComponents(selectMenu);
-
-      helpEmbed
-        .setThumbnail(client.user.displayAvatarURL({ dynamic: true }))
-        .setTitle('✨ Help Menu')
-        .setDescription(
-          'Browse available commands by selecting a category from the menu below. Use `/help <command>` for detailed info about a specific command.'
-        )
-        .addFields(
-          Object.entries(categories).map(([category, commands]) => ({
-            name: `${category}`,
-            value: `${commands.length} commands available`,
-            inline: true,
-          }))
-        );
-
-      await interaction.reply({ embeds: [helpEmbed], components: [row] });
-
-      const filter = (i) =>
-        (i.customId === 'help-menu' ||
-          i.customId === 'prev_page' ||
-          i.customId === 'next_page') &&
-        i.user.id === interaction.user.id;
-      const collector = interaction.channel.createMessageComponentCollector({
-        filter,
-        time: 60000,
-      });
-
-      let page = 0;
-      let selectedCategory = Object.keys(categories)[0];
-      const PAGE_SIZE = 6;
-
-      async function updateCategoryEmbed(i, category, pageNum) {
-        const commandsInCategory = categories[category];
-        const totalPages = Math.ceil(commandsInCategory.length / PAGE_SIZE);
-        const pagedCommands = commandsInCategory.slice(
-          pageNum * PAGE_SIZE,
-          (pageNum + 1) * PAGE_SIZE
-        );
-        const categoryEmbed = new EmbedBuilder()
-          .setColor(0x5865f2)
-          .setTitle(
-            `🔶 Commands: **${category}** (Page ${pageNum + 1}/${totalPages})`
-          )
-          .setDescription(
-            pagedCommands
-              .map((cmdName) => {
-                const cmd = client.commands.get(cmdName);
-                const cmdDescription =
-                  cmd?.data?.description || 'No description available.';
-                return `> \`/${cmdName}\` - ${cmdDescription}`;
-              })
-              .join('\n') || 'No commands available.'
-          )
-          .setFooter({
-            text: `Requested by ${interaction.user.tag}`,
-            iconURL: interaction.user.displayAvatarURL(),
-          })
-          .setTimestamp();
-        const prevBtn = new ButtonBuilder()
-          .setCustomId('prev_page')
-          .setLabel('Previous')
-          .setStyle('Secondary')
-          .setDisabled(pageNum === 0);
-        const nextBtn = new ButtonBuilder()
-          .setCustomId('next_page')
-          .setLabel('Next')
-          .setStyle('Secondary')
-          .setDisabled(pageNum + 1 >= totalPages);
-        const paginationRow = new ActionRowBuilder().addComponents(
-          prevBtn,
-          nextBtn
-        );
-        await i.update({
-          embeds: [categoryEmbed],
-          components: [row, paginationRow],
-        });
+      if (!cmd) {
+        return interaction.reply({ content: 'Command not found', ephemeral: true });
       }
 
-      collector.on('collect', async (i) => {
-        if (i.customId === 'help-menu') {
-          selectedCategory = i.values[0];
-          page = 0;
-          await updateCategoryEmbed(i, selectedCategory, page);
-        } else if (i.customId === 'prev_page') {
-          if (page > 0) page--;
-          await updateCategoryEmbed(i, selectedCategory, page);
-        } else if (i.customId === 'next_page') {
-          const commandsInCategory = categories[selectedCategory];
-          const totalPages = Math.ceil(commandsInCategory.length / PAGE_SIZE);
-          if (page + 1 < totalPages) page++;
-          await updateCategoryEmbed(i, selectedCategory, page);
-        }
-      });
+      baseEmbed
+        .setTitle(`/${cmd.data.name}`)
+        .setDescription(cmd.data.description || 'No description')
+        .addFields({
+          name: 'Usage',
+          value: `\`/${cmd.data.name}\``
+        });
 
-      collector.on('end', async () => {
-        const disabledMenu = selectMenu.setDisabled(true);
-        const disabledRow = new ActionRowBuilder().addComponents(disabledMenu);
-        await interaction.editReply({ components: [disabledRow] });
-      });
+      return interaction.reply({ embeds: [baseEmbed] });
     }
+
+    // 📁 CATEGORY BUILD
+    const categories = {};
+
+    for (const cmd of client.commands.values()) {
+      const raw = cmd.category || 'other';
+      if (!categories[raw]) categories[raw] = [];
+      categories[raw].push(cmd);
+    }
+
+    const categoryKeys = Object.keys(categories);
+
+    const menu = new StringSelectMenuBuilder()
+      .setCustomId('help_category')
+      .setPlaceholder('Select category')
+      .addOptions(
+        categoryKeys.map(cat => {
+          const meta = categoryMap[cat] || { name: cat, emoji: '📁' };
+
+          return {
+            label: meta.name,
+            value: cat,
+            description: `${categories[cat].length} commands`,
+          };
+        })
+      );
+
+    const row = new ActionRowBuilder().addComponents(menu);
+
+    const embed = new EmbedBuilder()
+      .setColor(0x5865f2)
+      .setTitle('Help Menu')
+      .setDescription('Select a category below.')
+      .setThumbnail(client.user.displayAvatarURL());
+
+    const msg = await interaction.reply({
+      embeds: [embed],
+      components: [row],
+      fetchReply: true,
+    });
+
+    let selected = categoryKeys[0];
+    let page = 0;
+    const PAGE_SIZE = 6;
+
+    const collector = msg.createMessageComponentCollector({
+      componentType: ComponentType.StringSelect,
+      time: 60000,
+    });
+
+    const update = async (i) => {
+      const cmds = categories[selected];
+      const pages = Math.ceil(cmds.length / PAGE_SIZE);
+
+      const slice = cmds.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
+
+      const pageEmbed = new EmbedBuilder()
+        .setColor(0x5865f2)
+        .setTitle(`📁 ${selected} (Page ${page + 1}/${pages})`)
+        .setDescription(
+          slice.map(c => `\`/${c.data.name}\` - ${c.data.description || 'No desc'}`).join('\n')
+        );
+
+      const buttons = new ActionRowBuilder().addComponents(
+        new ButtonBuilder()
+          .setCustomId('prev')
+          .setLabel('Previous')
+          .setStyle(2)
+          .setDisabled(page === 0),
+
+        new ButtonBuilder()
+          .setCustomId('next')
+          .setLabel('Next')
+          .setStyle(2)
+          .setDisabled(page + 1 >= pages)
+      );
+
+      await i.update({
+        embeds: [pageEmbed],
+        components: [row, buttons],
+      });
+    };
+
+    collector.on('collect', async (i) => {
+      if (i.customId === 'help_category') {
+        selected = i.values[0];
+        page = 0;
+        return update(i);
+      }
+
+      if (i.customId === 'next') {
+        page++;
+        return update(i);
+      }
+
+      if (i.customId === 'prev') {
+        page--;
+        return update(i);
+      }
+    });
+
+    collector.on('end', async () => {
+      row.components[0].setDisabled(true);
+      await msg.edit({ components: [row] });
+    });
   },
 };
