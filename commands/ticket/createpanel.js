@@ -5,29 +5,35 @@ const {
   StringSelectMenuBuilder,
   PermissionFlagsBits,
 } = require('discord.js');
-const TicketCategory = require('../../models/TicketCategory');
+
+const TicketPanel = require('../../models/TicketPanel');
 
 module.exports = {
   data: new SlashCommandBuilder()
     .setName('createpanel')
-    .setDescription('Create ticket panel')
+    .setDescription('Send ticket panel')
     .setDefaultMemberPermissions(PermissionFlagsBits.Administrator)
     .addChannelOption(opt =>
-      opt.setName('channel').setDescription('Panel channel').setRequired(true)
+      opt.setName('channel').setDescription('Channel').setRequired(true)
     ),
 
   async execute(interaction) {
     const channel = interaction.options.getChannel('channel');
 
-    const categories = await TicketCategory.find({
-      guildId: interaction.guild.id,
-    });
+    const panel = await TicketPanel.findOne({ guildId: interaction.guild.id });
+
+    if (!panel || panel.categories.length === 0) {
+      return interaction.reply({
+        content: '❌ No categories found in setup',
+        ephemeral: true,
+      });
+    }
 
     const menu = new StringSelectMenuBuilder()
       .setCustomId('ticket_open_menu')
-      .setPlaceholder('🍁 Select Ticket Type')
+      .setPlaceholder('🍁 Select Ticket Category')
       .addOptions(
-        categories.map(c => ({
+        panel.categories.map(c => ({
           label: c.name,
           value: c.name,
           emoji: c.emoji,
@@ -36,9 +42,10 @@ module.exports = {
       );
 
     const embed = new EmbedBuilder()
-      .setTitle('🌟 Ticket System')
-      .setDescription('Select a category to open a ticket')
-      .setColor('#FFD700');
+      .setTitle(panel.title)
+      .setDescription(panel.description)
+      .setFooter({ text: panel.footer })
+      .setColor('Gold');
 
     await channel.send({
       embeds: [embed],
@@ -46,7 +53,7 @@ module.exports = {
     });
 
     return interaction.reply({
-      content: '✅ Ticket panel created',
+      content: '✅ Panel sent',
       ephemeral: true,
     });
   },
