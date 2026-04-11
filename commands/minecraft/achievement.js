@@ -59,7 +59,6 @@ module.exports = {
         .setRequired(true)
     ),
 
-  // ================= AUTOCOMPLETE =================
   async autocomplete(interaction) {
     const focused = interaction.options.getFocused().toLowerCase();
 
@@ -71,7 +70,6 @@ module.exports = {
     return interaction.respond(choices).catch(() => {});
   },
 
-  // ================= MAIN =================
   async execute(interaction) {
     await interaction.deferReply().catch(() => {});
 
@@ -79,70 +77,54 @@ module.exports = {
     const head = interaction.options.getString('head');
     const text = interaction.options.getString('text');
 
-    // ================= OLD API BACKGROUND =================
+    // ================= API (TEXT ONLY BACKGROUND) =================
     const apiUrl =
       `https://minecraftskinstealer.com/achievement/2/${encodeURIComponent(head)}/${encodeURIComponent(text)}`;
 
-    let baseImage;
-    try {
-      baseImage = await loadImage(apiUrl);
-    } catch {
-      return interaction.editReply("❌ Failed to load achievement API image.");
-    }
+    const baseImage = await loadImage(apiUrl);
 
-    // ================= VALID ICON =================
-    if (!iconMap[icon]) {
-      return interaction.editReply("❌ Invalid icon selected.");
-    }
-
-    const iconPath = path.join(process.cwd(), "textures", iconMap[icon]);
+    // ================= ICON LOAD =================
+    const iconPath = path.join(process.cwd(), "textures", iconMap[icon] || "stone.png");
 
     if (!fs.existsSync(iconPath)) {
-      return interaction.editReply("❌ Missing texture file in /textures.");
+      return interaction.editReply("❌ Icon file missing.");
     }
 
-    let iconImage;
-    try {
-      iconImage = await loadImage(iconPath);
-    } catch {
-      return interaction.editReply("❌ Failed to load icon texture.");
-    }
+    const iconImage = await loadImage(iconPath);
 
-    // ================= CANVAS (ICON ONLY) =================
+    // ================= CANVAS =================
     const canvas = createCanvas(baseImage.width, baseImage.height);
     const ctx = canvas.getContext("2d");
 
-    // draw API image (old Minecraft look)
     ctx.drawImage(baseImage, 0, 0);
 
+    // ================= HARD FIX: REMOVE DEFAULT ICON AREA =================
+    // THIS is what removes diamond visually
+    ctx.fillStyle = "#c6c6c6";
+    ctx.fillRect(6, 6, 60, 60);
+
+    ctx.strokeStyle = "#3a3a3a";
+    ctx.strokeRect(6, 6, 60, 60);
+
     // ================= PERFECT ICON ALIGNMENT =================
-    const iconSize = 48;
+    const size = 48;
+    const x = 12;
+    const y = 12;
 
-    const paddingLeft = 12; // safe border distance
-    const iconX = paddingLeft;
-    const iconY = Math.floor((baseImage.height - iconSize) / 2);
+    ctx.drawImage(iconImage, x, y, size, size);
 
-    // prevents clipping at edges
-    const safeX = Math.max(paddingLeft, iconX);
-    const safeY = Math.max(6, iconY);
-
-    ctx.drawImage(iconImage, safeX, safeY, iconSize, iconSize);
-
-    // ================= FINAL IMAGE =================
     const buffer = canvas.toBuffer("image/png");
 
     const attachment = new AttachmentBuilder(buffer, {
       name: "achievement.png"
     });
 
-    // ================= EMBED (OLD STYLE) =================
     const embed = new EmbedBuilder()
       .setTitle("🏆 Minecraft Achievement")
       .setDescription("Custom achievement unlocked!")
       .setColor(0xffaa00)
       .setImage("attachment://achievement.png");
 
-    // ================= DOWNLOAD BUTTON =================
     const row = new ActionRowBuilder().addComponents(
       new ButtonBuilder()
         .setLabel("Download Achievement")
@@ -150,7 +132,6 @@ module.exports = {
         .setURL(apiUrl)
     );
 
-    // ================= SAFE SEND =================
     return interaction.editReply({
       embeds: [embed],
       components: [row],
