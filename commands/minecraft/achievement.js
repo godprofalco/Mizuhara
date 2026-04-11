@@ -73,61 +73,47 @@ module.exports = {
     try {
       baseImage = await loadImage(apiUrl);
     } catch {
-      return interaction.editReply("❌ Failed to load achievement API.");
+      return interaction.editReply("❌ API failed.");
     }
 
-    // ================= ICON LOAD =================
+    // ================= ICON =================
     const iconPath = path.join(process.cwd(), "textures", iconMap[icon] || "stone.png");
 
     if (!fs.existsSync(iconPath)) {
-      return interaction.editReply("❌ Icon missing in textures folder.");
+      return interaction.editReply("❌ Icon missing.");
     }
 
     const iconImage = await loadImage(iconPath);
 
-    // ================= CANVAS (FIXED SIZE FOR STABILITY) =================
-    const canvas = createCanvas(320, 64);
+    // ================= CANVAS =================
+    const canvas = createCanvas(baseImage.width, baseImage.height);
     const ctx = canvas.getContext("2d");
 
-    ctx.drawImage(baseImage, 0, 0, 320, 64);
+    // 🔥 STEP 1: draw API (text + UI stays)
+    ctx.drawImage(baseImage, 0, 0);
 
-    // ================= HARD SLOT MASK (DESTROYS OLD ICON) =================
-    const slot = { x: 6, y: 6, size: 60 };
+    // 🔥 STEP 2: FORCE HIDE default icon
+    const slotX = 6;
+    const slotY = 6;
+    const slotSize = 60;
 
     ctx.fillStyle = "#7a7a7a";
-    ctx.fillRect(slot.x, slot.y, slot.size, slot.size);
+    ctx.fillRect(slotX, slotY, slotSize, slotSize);
 
     ctx.fillStyle = "#9c9c9c";
-    ctx.fillRect(slot.x + 2, slot.y + 2, slot.size - 4, slot.size - 4);
+    ctx.fillRect(slotX + 2, slotY + 2, slotSize - 4, slotSize - 4);
 
     ctx.strokeStyle = "#2b2b2b";
-    ctx.strokeRect(slot.x, slot.y, slot.size, slot.size);
+    ctx.strokeRect(slotX, slotY, slotSize, slotSize);
 
-    // ================= ICON (CENTER PERFECT) =================
-    const iconSize = 34; // slightly better visual balance
+    // 🔥 STEP 3: paste YOUR icon
+    const iconSize = 34;
 
-    const iconX = slot.x + (slot.size - iconSize) / 2;
-    const iconY = slot.y + (slot.size - iconSize) / 2;
+    const iconX = slotX + (slotSize - iconSize) / 2;
+    const iconY = slotY + (slotSize - iconSize) / 2;
 
     ctx.imageSmoothingEnabled = false;
     ctx.drawImage(iconImage, iconX, iconY, iconSize, iconSize);
-
-    // ================= SAFE TEXT AREA =================
-    const textX = 80;
-    const textMaxWidth = 220;
-
-    ctx.fillStyle = "#ffffff";
-    ctx.font = "bold 16px sans-serif";
-    ctx.fillText(head, textX, 26);
-
-    ctx.fillStyle = "#dddddd";
-    ctx.font = "12px sans-serif";
-
-    // simple wrap protection
-    const shortText =
-      text.length > 40 ? text.slice(0, 40) + "..." : text;
-
-    ctx.fillText(shortText, textX, 46);
 
     // ================= OUTPUT =================
     const buffer = canvas.toBuffer("image/png");
@@ -143,7 +129,7 @@ module.exports = {
 
     const row = new ActionRowBuilder().addComponents(
       new ButtonBuilder()
-        .setLabel("Download Achievement")
+        .setLabel("Download")
         .setStyle(ButtonStyle.Link)
         .setURL(apiUrl)
     );
