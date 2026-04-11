@@ -1,40 +1,44 @@
 const fs = require('fs');
 const path = require('path');
 
-const logDir = path.join(__dirname, '../logs');
-if (!fs.existsSync(logDir)) {
-  fs.mkdirSync(logDir);
-}
-
-function logErrorToFile(error) {
-  const timestamp = new Date().toISOString();
-  const logFile = path.join(logDir, `${timestamp.split('T')[0]}-errors.log`);
-  const logMessage = `[${timestamp}] ${error.stack || error}\n\n`;
-
-  fs.appendFileSync(logFile, logMessage, 'utf8');
-}
-
 module.exports = (client) => {
+  const logDir = path.join(__dirname, '../logs');
+  fs.mkdirSync(logDir, { recursive: true });
+
+  function logErrorToFile(error) {
+    const timestamp = new Date().toISOString();
+    const date = timestamp.slice(0, 10);
+
+    const logFile = path.join(logDir, `${date}-errors.log`);
+    const logMessage = `[${timestamp}] ${error?.stack || error}\n\n`;
+
+    fs.appendFileSync(logFile, logMessage, 'utf8');
+  }
+
+  // 💥 SAFE GLOBAL ERROR HANDLERS
   process.on('uncaughtException', (err) => {
     console.error('Uncaught Exception:', err);
     logErrorToFile(err);
   });
 
-  process.on('unhandledRejection', (reason, promise) => {
-    console.error('Unhandled Rejection at:', promise, 'reason:', reason);
+  process.on('unhandledRejection', (reason) => {
+    console.error('Unhandled Rejection:', reason);
     logErrorToFile(reason instanceof Error ? reason : new Error(reason));
   });
 
+  // 💥 DISCORD CLIENT ERRORS
   client.on('error', (error) => {
-    console.error('Discord.js Error:', error);
+    console.error('Discord Client Error:', error);
     logErrorToFile(error);
   });
 
-  client.on('shardError', (error, shardId) => {
-    console.error(`Shard ${shardId} encountered an error:`, error);
+  // 💥 SHARD ERROR (FIXED)
+  client.on('shardError', (error) => {
+    console.error('Shard Error:', error);
     logErrorToFile(error);
   });
 
+  // 💥 SAFE SHUTDOWN
   process.on('SIGINT', () => {
     console.log('Bot shutting down (SIGINT)...');
     client.destroy();
