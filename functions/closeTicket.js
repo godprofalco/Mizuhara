@@ -1,4 +1,4 @@
-const Ticket = require('../../models/Ticket');
+const Ticket = require('../models/Ticket');
 
 module.exports = async (interaction) => {
   const ticket = await Ticket.findOne({ channelId: interaction.channel.id });

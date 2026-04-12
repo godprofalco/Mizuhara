@@ -1,6 +1,6 @@
 const { ChannelType, PermissionFlagsBits } = require('discord.js');
-const Ticket = require('../../models/Ticket');
-const TicketSettings = require('../../models/TicketSettings');
+const Ticket = require('../models/Ticket');
+const TicketSettings = require('../models/TicketSettings');
 
 module.exports = async (interaction, option, reason) => {
   const settings = await TicketSettings.findOne({ guildId: interaction.guild.id });

@@ -3,36 +3,64 @@ const {
   EmbedBuilder,
   ActionRowBuilder,
   StringSelectMenuBuilder,
+  PermissionFlagsBits,
 } = require('discord.js');
 
-const TicketPanel = require('../../models/TicketPanel');
+const TicketPanel = require('../models/TicketPanel.js');
 
 module.exports = {
   data: new SlashCommandBuilder()
     .setName('createpanel')
     .setDescription('Send ticket panel')
-    .addChannelOption(o => o.setName('channel').setRequired(true)),
+    .setDefaultMemberPermissions(PermissionFlagsBits.Administrator)
+    .addChannelOption(o =>
+      o
+        .setName('channel')
+        .setDescription('Channel to send the ticket panel')
+        .setRequired(true)
+    ),
 
   async execute(interaction) {
-    const panel = await TicketPanel.findOne({ guildId: interaction.guild.id });
+
+    const channel = interaction.options.getChannel('channel');
+
+    const panel = await TicketPanel.findOne({
+      guildId: interaction.guild.id,
+    });
+
+    if (!panel || !panel.dropdowns || panel.dropdowns.length === 0) {
+      return interaction.reply({
+        content: '❌ No ticket dropdowns configured. Use setup first.',
+        ephemeral: true,
+      });
+    }
 
     const menu = new StringSelectMenuBuilder()
       .setCustomId('ticket_menu')
-      .addOptions(panel.dropdowns.map(d => ({
-        label: d.name,
-        value: d.name,
-        emoji: d.emoji,
-      })));
+      .setPlaceholder('🎫 Select a ticket type')
+      .addOptions(
+        panel.dropdowns.map(d => ({
+          label: d.name,
+          value: d.name,
+          emoji: d.emoji || '🎫',
+        }))
+      );
 
     const embed = new EmbedBuilder()
-      .setTitle(panel.title)
-      .setDescription(panel.description);
+      .setTitle(panel.title || 'Ticket Panel')
+      .setDescription(panel.description || 'Select an option below')
+      .setColor('Gold');
 
-    await interaction.options.getChannel('channel').send({
+    await channel.send({
       embeds: [embed],
-      components: [new ActionRowBuilder().addComponents(menu)],
+      components: [
+        new ActionRowBuilder().addComponents(menu)
+      ],
     });
 
-    interaction.reply({ content: '✅ Panel sent', ephemeral: true });
+    return interaction.reply({
+      content: '✅ Panel sent successfully',
+      ephemeral: true,
+    });
   },
 };
