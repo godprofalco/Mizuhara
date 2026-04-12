@@ -1,6 +1,5 @@
 const {
   SlashCommandBuilder,
-  EmbedBuilder,
   PermissionFlagsBits,
   ActionRowBuilder,
   ButtonBuilder,
@@ -8,54 +7,52 @@ const {
 } = require('discord.js');
 
 const TicketPanel = require('../../models/TicketPanel');
+const TicketSettings = require('../../models/TicketSettings');
 
 module.exports = {
   data: new SlashCommandBuilder()
     .setName('ticketsetup')
-    .setDescription('Open ticket setup UI')
+    .setDescription('Setup ticket system')
     .setDefaultMemberPermissions(PermissionFlagsBits.Administrator),
 
   async execute(interaction) {
 
-    let panel = await TicketPanel.findOne({ guildId: interaction.guild.id });
-
-    if (!panel) {
-      panel = await TicketPanel.create({
+    await TicketPanel.findOneAndUpdate(
+      { guildId: interaction.guild.id },
+      {
         guildId: interaction.guild.id,
         title: '🎫 Tickets',
-        description: 'Select category',
+        description: 'Select option',
         footer: 'Ticket System',
         dropdowns: [],
-      });
-    }
+      },
+      { upsert: true }
+    );
 
-    const embed = new EmbedBuilder()
-      .setTitle('⚙️ Ticket Setup')
-      .setDescription(
-        `Title: ${panel.title}\n` +
-        `Dropdowns: ${panel.dropdowns.length}`
-      )
-      .setColor('#5865f2');
+    await TicketSettings.findOneAndUpdate(
+      { guildId: interaction.guild.id },
+      {
+        guildId: interaction.guild.id,
+        supportRoleIds: [],
+        adminRoleIds: [],
+      },
+      { upsert: true }
+    );
 
     const row = new ActionRowBuilder().addComponents(
-      new ButtonBuilder()
-        .setCustomId('setup_edit_embed')
-        .setLabel('Edit Embed')
-        .setStyle(ButtonStyle.Primary),
-
       new ButtonBuilder()
         .setCustomId('setup_add_dropdown')
         .setLabel('Add Dropdown')
         .setStyle(ButtonStyle.Success),
 
       new ButtonBuilder()
-        .setCustomId('setup_remove_dropdown')
-        .setLabel('Remove Dropdown')
-        .setStyle(ButtonStyle.Danger),
+        .setCustomId('setup_roles')
+        .setLabel('Set Roles')
+        .setStyle(ButtonStyle.Primary)
     );
 
-    return interaction.reply({
-      embeds: [embed],
+    await interaction.reply({
+      content: '⚙️ Setup Panel Opened',
       components: [row],
       ephemeral: true,
     });
