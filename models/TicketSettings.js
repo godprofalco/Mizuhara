@@ -1,16 +1,46 @@
 const mongoose = require('mongoose');
 
-const ticketSettingsSchema = new mongoose.Schema({
-  guildId: { type: String, unique: true },
+const TicketSettingsSchema = new mongoose.Schema({
+  guildId: {
+    type: String,
+    required: true,
+    unique: true,
+  },
 
-  enabled: { type: Boolean, default: false },
+  enabled: {
+    type: Boolean,
+    default: true,
+  },
 
-  categoryId: String, // ticket parent category
-  logChannelId: String,
+  // 👮 Support roles (can see tickets)
+  supportRoleIds: {
+    type: [String],
+    default: [],
+  },
 
-  supportRoleIds: [String],
+  // 📂 Default fallback category (if dropdown has none)
+  categoryId: {
+    type: String,
+    default: null,
+  },
 
-  ticketLimit: { type: Number, default: 3 },
+  // 📜 Logs channel (for close logs / transcripts)
+  logChannelId: {
+    type: String,
+    default: null,
+  },
+
+  // 🔢 Optional: ticket limit per user
+  ticketLimit: {
+    type: Number,
+    default: 3,
+  },
+
+  // 🔢 Ticket counter (for numbering system later)
+  ticketCounter: {
+    type: Number,
+    default: 0,
+  },
 });
 
-module.exports = mongoose.model('TicketSettings', ticketSettingsSchema);
+module.exports = mongoose.model('TicketSettings', TicketSettingsSchema);
