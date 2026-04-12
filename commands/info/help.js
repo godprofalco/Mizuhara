@@ -4,6 +4,7 @@ const {
   ActionRowBuilder,
   StringSelectMenuBuilder,
   ButtonBuilder,
+  ButtonStyle,
 } = require('discord.js');
 const Fuse = require('fuse.js');
 
@@ -12,46 +13,48 @@ module.exports = {
     .setName('help')
     .setDescription('🌟 View all commands or get detailed help')
 
-    .addStringOption((option) =>
+    .addStringOption(option =>
       option
         .setName('command')
         .setDescription('🔍 Get info about a command')
         .setAutocomplete(true)
     )
 
-    .addStringOption((option) =>
+    .addStringOption(option =>
       option
         .setName('search')
         .setDescription('⚡ Search commands')
     ),
 
   async autocomplete(interaction) {
-    const focusedValue = interaction.options.getFocused().trim();
-    const commandNames = [...interaction.client.commands.keys()];
+    const focused = interaction.options.getFocused().toLowerCase();
+    const commands = [...interaction.client.commands.keys()];
 
-    const filtered = commandNames
-      .filter((name) => name.startsWith(focusedValue))
+    const filtered = commands
+      .filter(cmd => cmd.toLowerCase().includes(focused))
       .slice(0, 10)
-      .map((name) => ({ name, value: name }));
+      .map(cmd => ({ name: cmd, value: cmd }));
 
     await interaction.respond(filtered);
   },
 
   async execute(interaction) {
     const { client } = interaction;
+
     const commandName = interaction.options.getString('command');
     const searchQuery = interaction.options.getString('search');
 
     const categoryMap = {
       admin: { name: 'Administration', emoji: '⚙️' },
       fun: { name: 'Fun & Games', emoji: '🎉' },
-      level: { name: 'Leaderboard', emoji: '🎮' },
+      level: { name: 'Level System', emoji: '🎮' },
       music: { name: 'Music', emoji: '🎵' },
       moderation: { name: 'Moderation', emoji: '🔨' },
       utility: { name: 'Utility', emoji: '🪛' },
       minecraft: { name: 'Minecraft', emoji: '🟩' },
       info: { name: 'Information', emoji: 'ℹ️' },
-      tickets: { name: 'Tickets', emoji: '🎫' },
+      ticket: { name: 'Tickets', emoji: '🎫' },
+      other: { name: 'Other', emoji: '📁' },
     };
 
     const baseEmbed = new EmbedBuilder()
@@ -80,15 +83,12 @@ module.exports = {
 
       const embed = new EmbedBuilder()
         .setColor(0x5865f2)
-        .setTitle(`🔎 Search Results`)
+        .setTitle('🔎 Search Results')
         .setDescription(
-          results
-            .slice(0, 10)
-            .map(
-              (r, i) =>
-                `**${i + 1}.** \`/${r.item.data.name}\`\n🌸 ${r.item.data.description || 'No description'}`
-            )
-            .join('\n\n')
+          results.slice(0, 10).map((r, i) => {
+            const cmd = r.item;
+            return `**${i + 1}.** \`/${cmd.data.name}\`\n🌸 ${cmd.data.description || 'No description'}`;
+          }).join('\n\n')
         )
         .setFooter({
           text: `🌟 Found ${results.length} results`,
@@ -110,41 +110,19 @@ module.exports = {
 
       const embed = baseEmbed
         .setTitle(`🌟 /${command.data.name}`)
-        .setDescription(`🌸 ${command.data.description || 'No description'}`)
-
-        .addFields({
-          name: '⚡ Usage',
-          value:
-            `\`/${command.data.name}\`` +
-            (command.data.options?.length
-              ? ' ' +
-                command.data.options.map((opt) => `<${opt.name}>`).join(' ')
-              : ''),
-        });
-
-      if (command.data.options?.length) {
-        embed.addFields({
-          name: '🧩 Options',
-          value: command.data.options
-            .map(
-              (opt) =>
-                `• \`${opt.name}\` → ${opt.description || 'No description'}`
-            )
-            .join('\n'),
-        });
-      }
+        .setDescription(`🌸 ${command.data.description || 'No description'}`);
 
       return interaction.reply({ embeds: [embed] });
     }
 
-    // ================= MAIN MENU =================
+    // ================= CATEGORY BUILD =================
     const categories = {};
 
-    client.commands.forEach((cmd) => {
-      const rawCategory = cmd.category || 'other';
+    client.commands.forEach(cmd => {
+      const raw = cmd.category || 'other';
 
-      const display = categoryMap[rawCategory] || {
-        name: rawCategory,
+      const display = categoryMap[raw] || {
+        name: raw,
         emoji: '📁',
       };
 
@@ -154,14 +132,16 @@ module.exports = {
       categories[key].push(cmd.data.name);
     });
 
+    const categoryKeys = Object.keys(categories);
+
     const selectMenu = new StringSelectMenuBuilder()
       .setCustomId('help-menu')
       .setPlaceholder('🌟 Select a category')
       .addOptions(
-        Object.keys(categories).map((category) => ({
-          label: category,
-          value: category,
-          description: `View ${category} commands`,
+        categoryKeys.map(cat => ({
+          label: cat,
+          value: cat,
+          description: `View ${cat} commands`,
         }))
       );
 
@@ -176,49 +156,49 @@ module.exports = {
         '⚡ Use `/help search:<word>` to search'
       )
       .addFields(
-        Object.entries(categories).map(([cat, cmds]) => ({
-          name: `${cat}`,
-          value: `🌟 ${cmds.length} commands`,
+        categoryKeys.map(cat => ({
+          name: cat,
+          value: `🌟 ${categories[cat].length} commands`,
           inline: true,
         }))
       );
 
-    await interaction.reply({ embeds: [mainEmbed], components: [row] });
+    await interaction.reply({
+      embeds: [mainEmbed],
+      components: [row],
+    });
 
-    const filter = (i) =>
-      (i.customId === 'help-menu' ||
-        i.customId === 'prev' ||
-        i.customId === 'next') &&
-      i.user.id === interaction.user.id;
-
+    // ================= PAGINATION =================
     const collector = interaction.channel.createMessageComponentCollector({
-      filter,
+      filter: i =>
+        (i.customId === 'help-menu' ||
+          i.customId === 'prev' ||
+          i.customId === 'next') &&
+        i.user.id === interaction.user.id,
       time: 60000,
     });
 
+    let selectedCategory = categoryKeys[0];
     let page = 0;
-    let selectedCategory = Object.keys(categories)[0];
     const PAGE_SIZE = 6;
 
-    async function update(i, category, pageNum) {
-      const cmds = categories[category];
-      const totalPages = Math.ceil(cmds.length / PAGE_SIZE);
+    const update = async (i, category, pageNum) => {
+      const cmds = categories[category] || [];
+      const totalPages = Math.max(1, Math.ceil(cmds.length / PAGE_SIZE));
 
-      const current = cmds.slice(
+      const slice = cmds.slice(
         pageNum * PAGE_SIZE,
         (pageNum + 1) * PAGE_SIZE
       );
 
       const embed = new EmbedBuilder()
         .setColor(0x5865f2)
-        .setTitle(`🖼️ ${category}`)
+        .setTitle(category)
         .setDescription(
-          current
-            .map((c) => {
-              const cmd = client.commands.get(c);
-              return `> 🌸 \`/${c}\`\n⚡ ${cmd?.data?.description || 'No description'}`;
-            })
-            .join('\n\n')
+          slice.map(c => {
+            const cmd = client.commands.get(c);
+            return `> 🌸 \`/${c}\`\n⚡ ${cmd?.data?.description || 'No description'}`;
+          }).join('\n\n')
         )
         .setFooter({
           text: `📄 Page ${pageNum + 1}/${totalPages}`,
@@ -228,41 +208,45 @@ module.exports = {
         new ButtonBuilder()
           .setCustomId('prev')
           .setLabel('⬅️')
-          .setStyle('Secondary')
+          .setStyle(ButtonStyle.Secondary)
           .setDisabled(pageNum === 0),
 
         new ButtonBuilder()
           .setCustomId('next')
           .setLabel('➡️')
-          .setStyle('Secondary')
+          .setStyle(ButtonStyle.Secondary)
           .setDisabled(pageNum + 1 >= totalPages)
       );
 
-      await i.update({ embeds: [embed], components: [row, buttons] });
-    }
+      await i.update({
+        embeds: [embed],
+        components: [row, buttons],
+      });
+    };
 
-    collector.on('collect', async (i) => {
+    collector.on('collect', async i => {
       if (i.customId === 'help-menu') {
         selectedCategory = i.values[0];
         page = 0;
-        await update(i, selectedCategory, page);
+        return update(i, selectedCategory, page);
       }
 
       if (i.customId === 'prev') {
         page--;
-        await update(i, selectedCategory, page);
+        return update(i, selectedCategory, page);
       }
 
       if (i.customId === 'next') {
         page++;
-        await update(i, selectedCategory, page);
+        return update(i, selectedCategory, page);
       }
     });
 
     collector.on('end', async () => {
-      const disabled = selectMenu.setDisabled(true);
+      const disabledMenu = new StringSelectMenuBuilder(selectMenu).setDisabled(true);
+
       await interaction.editReply({
-        components: [new ActionRowBuilder().addComponents(disabled)],
+        components: [new ActionRowBuilder().addComponents(disabledMenu)],
       });
     });
   },
