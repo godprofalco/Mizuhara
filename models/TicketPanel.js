@@ -4,15 +4,16 @@ const dropdownSchema = new mongoose.Schema({
   name: String,
   emoji: String,
   description: String,
-  categoryId: String, // ✅ DISCORD CATEGORY LINK
+  categoryId: String,
 });
 
-const TicketPanelSchema = new mongoose.Schema({
-  guildId: String,
-  title: String,
-  description: String,
-  footer: String,
-  dropdowns: [dropdownSchema],
-});
-
-module.exports = mongoose.model('TicketPanel', TicketPanelSchema);
+module.exports = mongoose.model(
+  'TicketPanel',
+  new mongoose.Schema({
+    guildId: String,
+    title: String,
+    description: String,
+    footer: String,
+    dropdowns: [dropdownSchema],
+  })
+);
