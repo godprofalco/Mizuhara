@@ -2,6 +2,9 @@ const {
   SlashCommandBuilder,
   EmbedBuilder,
   PermissionFlagsBits,
+  ActionRowBuilder,
+  ButtonBuilder,
+  ButtonStyle,
 } = require('discord.js');
 
 const TicketPanel = require('../../models/TicketPanel');
@@ -9,46 +12,51 @@ const TicketPanel = require('../../models/TicketPanel');
 module.exports = {
   data: new SlashCommandBuilder()
     .setName('ticketsetup')
-    .setDescription('Setup ticket system')
+    .setDescription('Open ticket setup UI')
     .setDefaultMemberPermissions(PermissionFlagsBits.Administrator),
 
   async execute(interaction) {
-    if (!interaction.member.permissions.has(PermissionFlagsBits.Administrator)) {
-      return interaction.reply({ content: '❌ No permission', ephemeral: true });
+
+    let panel = await TicketPanel.findOne({ guildId: interaction.guild.id });
+
+    if (!panel) {
+      panel = await TicketPanel.create({
+        guildId: interaction.guild.id,
+        title: '🎫 Tickets',
+        description: 'Select category',
+        footer: 'Ticket System',
+        dropdowns: [],
+      });
     }
 
-    await TicketPanel.findOneAndUpdate(
-      { guildId: interaction.guildId },
-      {
-        guildId: interaction.guildId,
-        title: '🎫 Tickets',
-        description: 'Select a category to open a ticket',
-        footer: 'Ticket System',
+    const embed = new EmbedBuilder()
+      .setTitle('⚙️ Ticket Setup')
+      .setDescription(
+        `Title: ${panel.title}\n` +
+        `Dropdowns: ${panel.dropdowns.length}`
+      )
+      .setColor('#5865f2');
 
-        dropdowns: [
-          {
-            name: 'Support',
-            emoji: '🛠️',
-            description: 'Get help',
-            channelCategoryId: null,
-          },
-          {
-            name: 'Prices',
-            emoji: '💰',
-            description: 'Pricing help',
-            channelCategoryId: null,
-          },
-        ],
-      },
-      { upsert: true }
+    const row = new ActionRowBuilder().addComponents(
+      new ButtonBuilder()
+        .setCustomId('setup_edit_embed')
+        .setLabel('Edit Embed')
+        .setStyle(ButtonStyle.Primary),
+
+      new ButtonBuilder()
+        .setCustomId('setup_add_dropdown')
+        .setLabel('Add Dropdown')
+        .setStyle(ButtonStyle.Success),
+
+      new ButtonBuilder()
+        .setCustomId('setup_remove_dropdown')
+        .setLabel('Remove Dropdown')
+        .setStyle(ButtonStyle.Danger),
     );
 
     return interaction.reply({
-      embeds: [
-        new EmbedBuilder()
-          .setTitle('✅ Ticket System Setup Complete')
-          .setColor('Green')
-      ],
+      embeds: [embed],
+      components: [row],
       ephemeral: true,
     });
   },
