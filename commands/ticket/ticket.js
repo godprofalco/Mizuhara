@@ -1,5 +1,5 @@
 const { SlashCommandBuilder } = require('discord.js');
-const closeTicket = require('../../functions/ticket/closeTicket');
+const closeTicket = require('../../functions/closeTicket');
 
 module.exports = {
   data: new SlashCommandBuilder()

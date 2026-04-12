@@ -11,8 +11,8 @@ const {
 const TicketPanel = require('../../models/TicketPanel');
 const TicketBan = require('../../models/TicketBan');
 
-const createTicket = require('../../functions/ticket/createTicket');
-const closeTicket = require('../../functions/ticket/closeTicket');
+const createTicket = require('../../functions/createTicket');
+const closeTicket = require('../../functions/closeTicket');
 
 module.exports = {
   name: 'interactionCreate',
@@ -29,7 +29,7 @@ module.exports = {
         new ActionRowBuilder().addComponents(
           new TextInputBuilder()
             .setCustomId('reason')
-            .setLabel('Describe your issue')
+            .setLabel('Describe your issue in short')
             .setStyle(TextInputStyle.Paragraph)
         )
       );
