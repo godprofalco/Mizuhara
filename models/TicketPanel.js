@@ -7,14 +7,12 @@ const dropdownSchema = new mongoose.Schema({
   channelCategoryId: { type: String, default: null },
 });
 
-const panelSchema = new mongoose.Schema({
+const TicketPanelSchema = new mongoose.Schema({
   guildId: String,
-
   title: String,
   description: String,
   footer: String,
-
   dropdowns: [dropdownSchema],
 });
 
-module.exports = mongoose.model('TicketPanel', panelSchema);
+module.exports = mongoose.model('TicketPanel', TicketPanelSchema);
