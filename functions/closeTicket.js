@@ -1,16 +1,13 @@
-const Ticket = require('../models/Ticket');
+const Ticket = require('../../models/Ticket');
 
-module.exports = async (channel, user, reason = 'No reason provided') => {
-  const ticket = await Ticket.findOne({ channelId: channel.id });
-
+module.exports = async (interaction) => {
+  const ticket = await Ticket.findOne({ channelId: interaction.channel.id });
   if (!ticket) return;
 
   ticket.status = 'closed';
+  ticket.closedAt = new Date();
   await ticket.save();
 
-  await channel.send(`❄️ Ticket closing by ${user.tag}\nReason: ${reason}`);
-
-  setTimeout(() => {
-    channel.delete().catch(() => {});
-  }, 3000);
+  await interaction.channel.send('❄️ Closing ticket...');
+  setTimeout(() => interaction.channel.delete(), 3000);
 };
