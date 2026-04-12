@@ -6,7 +6,7 @@ const {
   PermissionFlagsBits,
 } = require('discord.js');
 
-const TicketPanel = require('../models/TicketPanel.js');
+const TicketPanel = require('../../models/TicketPanel');
 
 module.exports = {
   data: new SlashCommandBuilder()
