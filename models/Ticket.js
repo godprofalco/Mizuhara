@@ -1,12 +1,12 @@
 const mongoose = require('mongoose');
 
-const ticketSchema = new mongoose.Schema({
+const TicketSchema = new mongoose.Schema({
   guildId: String,
   channelId: String,
   userId: String,
-  status: { type: String, default: 'open' },
   reason: String,
+  status: { type: String, default: 'open' },
   createdAt: { type: Date, default: Date.now },
 });
 
-module.exports = mongoose.model('Ticket', ticketSchema);
+module.exports = mongoose.model('Ticket', TicketSchema);
