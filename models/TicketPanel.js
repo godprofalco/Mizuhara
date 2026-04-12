@@ -4,7 +4,7 @@ const dropdownSchema = new mongoose.Schema({
   name: String,
   emoji: String,
   description: String,
-  channelCategoryId: { type: String, default: null },
+  categoryId: String, // ✅ DISCORD CATEGORY LINK
 });
 
 const TicketPanelSchema = new mongoose.Schema({
