@@ -1,47 +1,77 @@
 const {
   SlashCommandBuilder,
+  ModalBuilder,
+  TextInputBuilder,
+  TextInputStyle,
   ActionRowBuilder,
-  ButtonBuilder,
-  ButtonStyle,
-  ChannelType
 } = require('discord.js');
+
+const OWNER_ID = "969181284784025670";
 
 module.exports = {
   data: new SlashCommandBuilder()
     .setName('embed')
-    .setDescription('🎨 Open embed builder')
-
-    .addChannelOption(opt =>
-      opt.setName('channel')
-        .setDescription('Where to send embed')
-        .addChannelTypes(ChannelType.GuildText)
-        .setRequired(true)
-    ),
+    .setDescription('📤 Send custom embed (Owner only)'),
 
   async execute(interaction) {
 
-    const DEV_ID = 'YOUR_DISCORD_ID';
-
-    if (interaction.user.id !== DEV_ID) {
+    // 🔒 OWNER LOCK
+    if (interaction.user.id !== OWNER_ID) {
       return interaction.reply({
-        content: '❌ Developer only.',
+        content: '❌ Only the bot owner can use this command.',
         ephemeral: true
       });
     }
 
-    const channel = interaction.options.getChannel('channel');
+    const modal = new ModalBuilder()
+      .setCustomId('embed_builder')
+      .setTitle('📤 Embed Builder');
 
-    const row = new ActionRowBuilder().addComponents(
-      new ButtonBuilder()
-        .setCustomId(`embed_modal_${channel.id}`)
-        .setLabel('🛠️ Configure Embed')
-        .setStyle(ButtonStyle.Primary)
+    const channel = new TextInputBuilder()
+      .setCustomId('channel')
+      .setLabel('Channel ID')
+      .setStyle(TextInputStyle.Short)
+      .setRequired(true);
+
+    const title = new TextInputBuilder()
+      .setCustomId('title')
+      .setLabel('Title')
+      .setStyle(TextInputStyle.Short)
+      .setRequired(false);
+
+    const description = new TextInputBuilder()
+      .setCustomId('description')
+      .setLabel('Description')
+      .setStyle(TextInputStyle.Paragraph)
+      .setRequired(false);
+
+    const footer = new TextInputBuilder()
+      .setCustomId('footer')
+      .setLabel('Footer')
+      .setStyle(TextInputStyle.Short)
+      .setRequired(false);
+
+    const topImage = new TextInputBuilder()
+      .setCustomId('top_image')
+      .setLabel('Top Image URL (above embed)')
+      .setStyle(TextInputStyle.Short)
+      .setRequired(false);
+
+    const bottomImage = new TextInputBuilder()
+      .setCustomId('bottom_image')
+      .setLabel('Bottom Image URL (below embed)')
+      .setStyle(TextInputStyle.Short)
+      .setRequired(false);
+
+    modal.addComponents(
+      new ActionRowBuilder().addComponents(channel),
+      new ActionRowBuilder().addComponents(title),
+      new ActionRowBuilder().addComponents(description),
+      new ActionRowBuilder().addComponents(footer),
+      new ActionRowBuilder().addComponents(topImage),
+      new ActionRowBuilder().addComponents(bottomImage),
     );
 
-    await interaction.reply({
-      content: `🎨 Configure embed for <#${channel.id}>`,
-      components: [row],
-      ephemeral: true
-    });
+    return interaction.showModal(modal);
   }
 };
