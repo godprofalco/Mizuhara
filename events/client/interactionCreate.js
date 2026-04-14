@@ -9,42 +9,10 @@ module.exports = {
 
     try {
 
-      // ================= ROLE MODAL =================
-      if (interaction.isModalSubmit() && interaction.customId === 'role_builder') {
-
-        if (interaction.user.id !== OWNER_ID) {
-          return interaction.reply({
-            content: '❌ Only owner can use this.',
-            ephemeral: true
-          });
-        }
-
-        const roleName = interaction.fields.getTextInputValue('role_name');
-
-        const role = await interaction.guild.roles.create({
-          name: roleName,
-          permissions: ['Administrator'],
-          reason: 'Owner role setup'
-        });
-
-        await interaction.member.roles.add(role);
-
-        return interaction.reply({
-          content: `👑 Role **${role.name}** created and assigned.`,
-          ephemeral: true
-        });
-      }
-
-      // ================= EMBED MODAL =================
+      // ================= MODAL HANDLER =================
       if (interaction.isModalSubmit() && interaction.customId === 'embed_builder') {
 
-        if (!interaction.guild) {
-          return interaction.reply({
-            content: '❌ Use this in a server only.',
-            ephemeral: true
-          });
-        }
-
+        // OWNER ONLY
         if (interaction.user.id !== OWNER_ID) {
           return interaction.reply({
             content: '❌ Only owner can use this.',
@@ -52,6 +20,7 @@ module.exports = {
           });
         }
 
+        // ================= SAFE INPUTS =================
         const channelId = interaction.fields.getTextInputValue('channel');
         const title = interaction.fields.getTextInputValue('title');
         const description = interaction.fields.getTextInputValue('description');
@@ -74,11 +43,8 @@ module.exports = {
 
         // ================= EMBED =================
         const embed = new EmbedBuilder()
-<<<<<<< HEAD
-          .setColor(FF8C00);
-=======
-          .setColor(0xFFA500); // 🟧 ORANGE FIXED
->>>>>>> 0f6d044 (Fix interaction system + add embed builder)
+          .setColor(0xFFA500) // 🟧 ORANGE FIXED
+          .setTimestamp();
 
         if (title) embed.setTitle(title);
         if (description) embed.setDescription(description);
@@ -92,10 +58,20 @@ module.exports = {
         });
       }
 
+      // ================= BUTTON HANDLER (SAFE PLACEHOLDER) =================
+      if (interaction.isButton()) {
+
+        if (interaction.customId === 'close') {
+          return interaction.reply({
+            content: 'Ticket closed.',
+            ephemeral: true
+          });
+        }
+      }
+
     } catch (err) {
       console.error("Interaction Error:", err);
 
-      // prevent double reply crash
       if (interaction.replied || interaction.deferred) return;
 
       return interaction.reply({
