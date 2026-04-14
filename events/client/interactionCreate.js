@@ -38,6 +38,13 @@ module.exports = {
       // ================= EMBED MODAL =================
       if (interaction.isModalSubmit() && interaction.customId === 'embed_builder') {
 
+        if (!interaction.guild) {
+          return interaction.reply({
+            content: '❌ Use this in a server only.',
+            ephemeral: true
+          });
+        }
+
         if (interaction.user.id !== OWNER_ID) {
           return interaction.reply({
             content: '❌ Only owner can use this.',
@@ -67,7 +74,11 @@ module.exports = {
 
         // ================= EMBED =================
         const embed = new EmbedBuilder()
+<<<<<<< HEAD
           .setColor(FF8C00);
+=======
+          .setColor(0xFFA500); // 🟧 ORANGE FIXED
+>>>>>>> 0f6d044 (Fix interaction system + add embed builder)
 
         if (title) embed.setTitle(title);
         if (description) embed.setDescription(description);
@@ -84,6 +95,7 @@ module.exports = {
     } catch (err) {
       console.error("Interaction Error:", err);
 
+      // prevent double reply crash
       if (interaction.replied || interaction.deferred) return;
 
       return interaction.reply({

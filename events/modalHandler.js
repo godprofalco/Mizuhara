@@ -1,57 +1,72 @@
 const { Events, EmbedBuilder } = require('discord.js');
 
+const OWNER_ID = "969181284784025670";
+
 module.exports = {
   name: Events.InteractionCreate,
+
   async execute(interaction) {
+
     if (!interaction.isModalSubmit()) return;
     if (interaction.customId !== 'embed_builder') return;
 
     try {
-      const title = interaction.fields.getTextInputValue('embed_title');
-      const description =
-        interaction.fields.getTextInputValue('embed_description');
-      const color = interaction.fields.getTextInputValue('embed_color');
-      const authorInput = interaction.fields.getTextInputValue('embed_author');
-      const fieldsInput = interaction.fields.getTextInputValue('embed_fields');
 
+      // ================= OWNER ONLY =================
+      if (interaction.user.id !== OWNER_ID) {
+        return interaction.reply({
+          content: '❌ Only owner can use this.',
+          ephemeral: true
+        });
+      }
+
+      // ================= FIELD SAFE READ =================
+      const channelId = interaction.fields.getTextInputValue('channel');
+      const title = interaction.fields.getTextInputValue('title');
+      const description = interaction.fields.getTextInputValue('description');
+      const footer = interaction.fields.getTextInputValue('footer');
+      const topImage = interaction.fields.getTextInputValue('top_image');
+
+      // ================= VALID CHANNEL =================
+      const channel = await interaction.guild.channels.fetch(channelId).catch(() => null);
+
+      if (!channel) {
+        return interaction.reply({
+          content: '❌ Invalid channel ID',
+          ephemeral: true
+        });
+      }
+
+      // ================= TOP IMAGE =================
+      if (topImage) {
+        await channel.send({ content: topImage });
+      }
+
+      // ================= EMBED =================
       const embed = new EmbedBuilder()
-        .setDescription(description)
+        .setColor(0xFFA500) // 🟧 SAFE ORANGE
         .setTimestamp();
 
       if (title) embed.setTitle(title);
-      if (color) embed.setColor(color);
+      if (description) embed.setDescription(description);
+      if (footer) embed.setFooter({ text: footer });
 
-      if (authorInput) {
-        const [authorName, authorUrl, authorIconUrl] = authorInput.split('|');
-        embed.setAuthor({
-          name: authorName,
-          url: authorUrl || null,
-          iconURL: authorIconUrl || null,
-        });
-      }
+      await channel.send({ embeds: [embed] });
 
-      if (fieldsInput && fieldsInput.trim()) {
-        const fields = fieldsInput.split('\n').map((field) => {
-          const [name, value, inline] = field.split('|');
-          return {
-            name: name || '\u200b',
-            value: value || '\u200b',
-            inline: inline === 'true',
-          };
-        });
-        embed.addFields(fields);
-      }
-
-      await interaction.reply({ embeds: [embed] });
-    } catch (error) {
-      console.error('Error creating embed:', error);
-      await interaction.reply({
-        content: 'Error creating embed. Check your inputs and try again.',
-        ephemeral: true,
+      return interaction.reply({
+        content: `✅ Embed sent successfully in <#${channel.id}>`,
+        ephemeral: true
       });
+
+    } catch (error) {
+      console.error('Embed Error:', error);
+
+      if (interaction.replied || interaction.deferred) return;
+
+      return interaction.reply({
+        content: '❌ Error creating embed',
+        ephemeral: true
+      }).catch(() => {});
     }
   },
 };
-
-
-
