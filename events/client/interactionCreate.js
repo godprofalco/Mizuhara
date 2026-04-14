@@ -67,7 +67,7 @@ module.exports = {
 
         // ================= EMBED =================
         const embed = new EmbedBuilder()
-          .setColor(0x2b2d31);
+          .setColor(FF8C00);
 
         if (title) embed.setTitle(title);
         if (description) embed.setDescription(description);
