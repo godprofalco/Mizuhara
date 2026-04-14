@@ -1,6 +1,4 @@
-const {
-  EmbedBuilder,
-} = require('discord.js');
+const { EmbedBuilder } = require('discord.js');
 
 const OWNER_ID = "969181284784025670";
 
@@ -52,7 +50,6 @@ module.exports = {
         const description = interaction.fields.getTextInputValue('description');
         const footer = interaction.fields.getTextInputValue('footer');
         const topImage = interaction.fields.getTextInputValue('top_image');
-        const bottomImage = interaction.fields.getTextInputValue('bottom_image');
 
         const channel = await interaction.guild.channels.fetch(channelId).catch(() => null);
 
@@ -63,12 +60,12 @@ module.exports = {
           });
         }
 
-        // TOP IMAGE (message before embed)
+        // ================= TOP IMAGE =================
         if (topImage) {
           await channel.send({ content: topImage });
         }
 
-        // EMBED
+        // ================= EMBED =================
         const embed = new EmbedBuilder()
           .setColor(0x2b2d31);
 
@@ -78,13 +75,8 @@ module.exports = {
 
         await channel.send({ embeds: [embed] });
 
-        // BOTTOM IMAGE (message after embed)
-        if (bottomImage) {
-          await channel.send({ content: bottomImage });
-        }
-
         return interaction.reply({
-          content: `✅ Embed sent successfully!`,
+          content: `✅ Embed sent successfully in <#${channel.id}>`,
           ephemeral: true
         });
       }

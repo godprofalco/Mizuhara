@@ -11,21 +11,20 @@ const OWNER_ID = "969181284784025670";
 module.exports = {
   data: new SlashCommandBuilder()
     .setName('embed')
-    .setDescription('📤 Send custom embed (Owner only)'),
+    .setDescription('📤 Embed Builder'),
 
   async execute(interaction) {
 
-    // 🔒 OWNER LOCK
     if (interaction.user.id !== OWNER_ID) {
       return interaction.reply({
-        content: '❌ Only the bot owner can use this command.',
+        content: '❌ Only owner can use this.',
         ephemeral: true
       });
     }
 
     const modal = new ModalBuilder()
       .setCustomId('embed_builder')
-      .setTitle('📤 Embed Builder');
+      .setTitle('Embed Builder');
 
     const channel = new TextInputBuilder()
       .setCustomId('channel')
@@ -53,13 +52,7 @@ module.exports = {
 
     const topImage = new TextInputBuilder()
       .setCustomId('top_image')
-      .setLabel('Top Image URL (above embed)')
-      .setStyle(TextInputStyle.Short)
-      .setRequired(false);
-
-    const bottomImage = new TextInputBuilder()
-      .setCustomId('bottom_image')
-      .setLabel('Bottom Image URL (below embed)')
+      .setLabel('Top Image URL (before embed)')
       .setStyle(TextInputStyle.Short)
       .setRequired(false);
 
@@ -69,7 +62,6 @@ module.exports = {
       new ActionRowBuilder().addComponents(description),
       new ActionRowBuilder().addComponents(footer),
       new ActionRowBuilder().addComponents(topImage),
-      new ActionRowBuilder().addComponents(bottomImage),
     );
 
     return interaction.showModal(modal);
