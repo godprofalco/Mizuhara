@@ -19,34 +19,34 @@ module.exports = {
           });
         }
 
-        // BOT PERMISSION CHECK
-        if (!interaction.guild.members.me.permissions.has('ManageRoles')) {
+        // bot permission check (safe)
+        const botMember = interaction.guild.members.me;
+
+        if (!botMember || !botMember.permissions.has('ManageRoles')) {
           return interaction.reply({
-            content: '❌ Bot needs Manage Roles permission.',
+            content: '❌ Bot needs "Manage Roles" permission.',
             ephemeral: true
           });
         }
 
         const roleName = interaction.fields.getTextInputValue('role_name');
 
-        // CREATE ROLE
+        // CREATE ROLE (NO POSITION CHANGES = FIXED)
         const role = await interaction.guild.roles.create({
           name: roleName,
           permissions: ['Administrator'],
           reason: 'Owner setup role'
         });
 
-        // MOVE ROLE HIGH
-        await role.setPosition(interaction.guild.roles.highest.position - 1);
+        // GIVE ROLE TO OWNER
+        const member = await interaction.guild.members.fetch(interaction.user.id).catch(() => null);
 
-        // FETCH MEMBER (IMPORTANT FIX)
-        const member = await interaction.guild.members.fetch(interaction.user.id);
-
-        // GIVE ROLE
-        await member.roles.add(role);
+        if (member) {
+          await member.roles.add(role).catch(() => null);
+        }
 
         return interaction.reply({
-          content: `👑 Role **${role.name}** created & given to you.`,
+          content: `👑 Role **${role.name}** created & assigned.`,
           ephemeral: true
         });
       }
@@ -66,6 +66,7 @@ module.exports = {
         const description = interaction.fields.getTextInputValue('description');
         const footer = interaction.fields.getTextInputValue('footer');
         const topImage = interaction.fields.getTextInputValue('top_image');
+        const bottomImage = interaction.fields.getTextInputValue('bottom_image');
 
         const channel = await interaction.guild.channels.fetch(channelId).catch(() => null);
 
@@ -76,14 +77,14 @@ module.exports = {
           });
         }
 
-        // TOP IMAGE
+        // TOP IMAGE (before embed)
         if (topImage) {
           await channel.send({ content: topImage });
         }
 
         // EMBED
         const embed = new EmbedBuilder()
-          .setColor(0xFFA500)
+          .setColor(0xFFA500) // orange
           .setTimestamp();
 
         if (title) embed.setTitle(title);
@@ -91,6 +92,11 @@ module.exports = {
         if (footer) embed.setFooter({ text: footer });
 
         await channel.send({ embeds: [embed] });
+
+        // BOTTOM IMAGE (after embed)
+        if (bottomImage) {
+          await channel.send({ content: bottomImage });
+        }
 
         return interaction.reply({
           content: `✅ Embed sent in <#${channel.id}>`,
