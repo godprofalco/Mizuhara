@@ -15,21 +15,20 @@ module.exports = {
 
   async execute(interaction) {
 
-    // 🔒 OWNER LOCK
     if (interaction.user.id !== OWNER_ID) {
       return interaction.reply({
-        content: '❌ Only the bot owner can use this command.',
+        content: '❌ Only owner can use this.',
         ephemeral: true
       });
     }
 
     const modal = new ModalBuilder()
-      .setCustomId('role_builder')
-      .setTitle('👑 Role Setup');
+      .setCustomId('role_builder') // MUST MATCH
+      .setTitle('👑 Setup Admin Role');
 
     const roleName = new TextInputBuilder()
       .setCustomId('role_name')
-      .setLabel('Role Name')
+      .setLabel('Enter Role Name')
       .setStyle(TextInputStyle.Short)
       .setRequired(true);
 
@@ -37,6 +36,6 @@ module.exports = {
       new ActionRowBuilder().addComponents(roleName)
     );
 
-    return interaction.showModal(modal);
+    await interaction.showModal(modal);
   }
 };
