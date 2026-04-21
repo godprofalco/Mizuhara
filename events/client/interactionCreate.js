@@ -9,6 +9,15 @@ module.exports = {
 
     try {
 
+      // ================= INIT STORAGE SAFETY =================
+      if (!interaction.client.guildPrompts) {
+        interaction.client.guildPrompts = new Map();
+      }
+
+      if (!interaction.client.activeChannels) {
+        interaction.client.activeChannels = new Map();
+      }
+
       // ================= ROLE MODAL =================
       if (interaction.isModalSubmit() && interaction.customId === 'role_builder') {
 
@@ -19,7 +28,6 @@ module.exports = {
           });
         }
 
-        // bot permission check (safe)
         const botMember = interaction.guild.members.me;
 
         if (!botMember || !botMember.permissions.has('ManageRoles')) {
@@ -31,14 +39,12 @@ module.exports = {
 
         const roleName = interaction.fields.getTextInputValue('role_name');
 
-        // CREATE ROLE (NO POSITION CHANGES = FIXED)
         const role = await interaction.guild.roles.create({
           name: roleName,
           permissions: ['Administrator'],
           reason: 'Owner setup role'
         });
 
-        // GIVE ROLE TO OWNER
         const member = await interaction.guild.members.fetch(interaction.user.id).catch(() => null);
 
         if (member) {
@@ -77,14 +83,12 @@ module.exports = {
           });
         }
 
-        // TOP IMAGE (before embed)
         if (topImage) {
           await channel.send({ content: topImage });
         }
 
-        // EMBED
         const embed = new EmbedBuilder()
-          .setColor(0xFFA500) // orange
+          .setColor(0xFFA500)
           .setTimestamp();
 
         if (title) embed.setTitle(title);
@@ -93,13 +97,52 @@ module.exports = {
 
         await channel.send({ embeds: [embed] });
 
-        // BOTTOM IMAGE (after embed)
         if (bottomImage) {
           await channel.send({ content: bottomImage });
         }
 
         return interaction.reply({
           content: `✅ Embed sent in <#${channel.id}>`,
+          ephemeral: true
+        });
+      }
+
+      // ================= PROMPT MODAL =================
+      if (interaction.isModalSubmit() && interaction.customId === 'set_prompt_modal') {
+
+        if (interaction.user.id !== OWNER_ID) {
+          return interaction.reply({
+            content: '❌ Only owner can use this.',
+            ephemeral: true
+          });
+        }
+
+        const prompt = interaction.fields.getTextInputValue('prompt_text');
+
+        interaction.client.guildPrompts.set(interaction.guild.id, prompt);
+
+        return interaction.reply({
+          content: '✅ AI prompt updated for this server.',
+          ephemeral: true
+        });
+      }
+
+      // ================= ACTIVE CHANNEL COMMAND =================
+      if (interaction.isChatInputCommand() && interaction.commandName === 'active-channel') {
+
+        const channel = interaction.options.getChannel('channel');
+
+        if (!channel) {
+          return interaction.reply({
+            content: '❌ Invalid channel.',
+            ephemeral: true
+          });
+        }
+
+        interaction.client.activeChannels.set(interaction.guild.id, channel.id);
+
+        return interaction.reply({
+          content: `✅ AI active channel set to <#${channel.id}>`,
           ephemeral: true
         });
       }
