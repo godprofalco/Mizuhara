@@ -10,6 +10,19 @@ const ai = new OpenAI({
   baseURL: "https://generativelanguage.googleapis.com/v1beta/openai/"
 });
 
+// ================= COOLDOWN SYSTEM =================
+const cooldown = new Map();
+
+function isRateLimited(userId) {
+  const now = Date.now();
+  const last = cooldown.get(userId);
+
+  if (last && now - last < 4000) return true;
+
+  cooldown.set(userId, now);
+  return false;
+}
+
 module.exports = {
   name: Events.MessageCreate,
   once: false,
@@ -25,17 +38,19 @@ module.exports = {
 
     try {
 
+      // ================= COOLDOWN CHECK =================
+      if (isRateLimited(message.author.id)) return;
+
       // ================= DM MODE =================
       if (!message.guild) {
         const reply = await askAI(GLOBAL_PROMPT, message.content);
-        return message.reply(reply);
+        return safeReply(message, reply);
       }
 
       // ================= SERVER MODE =================
       const guildId = message.guild.id;
 
       const activeChannel = client.activeChannels.get(guildId);
-
       if (!activeChannel) return;
 
       if (message.channel.id !== activeChannel) return;
@@ -45,13 +60,31 @@ module.exports = {
 
       const reply = await askAI(prompt, message.content);
 
-      return message.reply(reply);
+      return safeReply(message, reply);
 
     } catch (err) {
       console.error("AI Error:", err);
     }
   }
 };
+
+// ================= SAFE REPLY =================
+async function safeReply(message, content) {
+  try {
+    if (!content || typeof content !== "string") {
+      return message.reply("❌ AI returned empty response.");
+    }
+
+    if (content.length > 2000) {
+      content = content.slice(0, 1990) + "...";
+    }
+
+    return message.reply(content);
+
+  } catch (err) {
+    console.error("Reply Error:", err);
+  }
+}
 
 // ================= GEMINI AI FUNCTION =================
 async function askAI(prompt, userMessage) {
@@ -75,10 +108,10 @@ Rules:
       ]
     });
 
-    return res.choices[0].message.content;
+    return res.choices?.[0]?.message?.content || "❌ No response from AI.";
 
   } catch (err) {
     console.error(err);
     return "❌ AI error occurred.";
   }
-}
+        }
