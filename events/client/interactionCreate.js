@@ -25,7 +25,8 @@ module.exports = {
           return interaction.reply({ content: '❌ Only owner can use this.', ephemeral: true });
         }
 
-        const botMember = interaction.guild.members.me;
+        const botMember = interaction.guild?.members?.me;
+        if (!botMember) return;
 
         if (!botMember.permissions.has(PermissionsBitField.Flags.ManageRoles)) {
           return interaction.reply({ content: '❌ Bot needs Manage Roles.', ephemeral: true });
@@ -92,6 +93,8 @@ module.exports = {
       // ================= PROMPT MODAL =================
       if (interaction.isModalSubmit() && interaction.customId === 'set_prompt_modal') {
 
+        if (!interaction.guild) return;
+
         const isOwner = interaction.guild.ownerId === interaction.user.id;
         const isBotOwner = interaction.user.id === OWNER_ID;
         const isAdmin = interaction.member.permissions.has(PermissionsBitField.Flags.Administrator);
@@ -115,6 +118,8 @@ module.exports = {
 
       // ================= ACTIVE CHANNEL =================
       if (interaction.isChatInputCommand() && interaction.commandName === 'active-channel') {
+
+        if (!interaction.guild) return;
 
         const isOwner = interaction.guild.ownerId === interaction.user.id;
         const isBotOwner = interaction.user.id === OWNER_ID;
