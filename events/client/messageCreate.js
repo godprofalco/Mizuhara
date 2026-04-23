@@ -2,15 +2,15 @@ const { Events } = require('discord.js');
 const OpenAI = require('openai');
 
 // 🌍 GLOBAL PROMPT
-const GLOBAL_PROMPT = "You are a helpful sexy AI assistant and say husband to everyone.";
+const GLOBAL_PROMPT = "You are a helpful assistant.";
 
-// 🤖 GEMINI (OpenAI-compatible endpoint)
+// 🤖 GEMINI CLIENT
 const ai = new OpenAI({
   apiKey: process.env.GEMINI_API_KEY,
   baseURL: "https://generativelanguage.googleapis.com/v1beta/openai/"
 });
 
-// ================= COOLDOWN SYSTEM =================
+// ================= COOLDOWN =================
 const cooldown = new Map();
 
 function isRateLimited(userId) {
@@ -25,20 +25,17 @@ function isRateLimited(userId) {
 
 module.exports = {
   name: Events.MessageCreate,
-  once: false,
 
   async execute(message) {
     if (message.author.bot) return;
 
     const client = message.client;
 
-    // ================= INIT MAPS =================
     if (!client.guildPrompts) client.guildPrompts = new Map();
     if (!client.activeChannels) client.activeChannels = new Map();
 
     try {
 
-      // ================= COOLDOWN CHECK =================
       if (isRateLimited(message.author.id)) return;
 
       // ================= DM MODE =================
@@ -47,7 +44,6 @@ module.exports = {
         return safeReply(message, reply);
       }
 
-      // ================= SERVER MODE =================
       const guildId = message.guild.id;
 
       const activeChannel = client.activeChannels.get(guildId);
@@ -55,8 +51,7 @@ module.exports = {
 
       if (message.channel.id !== activeChannel) return;
 
-      const prompt =
-        client.guildPrompts.get(guildId) || GLOBAL_PROMPT;
+      const prompt = client.guildPrompts.get(guildId) || GLOBAL_PROMPT;
 
       const reply = await askAI(prompt, message.content);
 
@@ -71,35 +66,27 @@ module.exports = {
 // ================= SAFE REPLY =================
 async function safeReply(message, content) {
   try {
-    if (!content || typeof content !== "string") {
-      return message.reply("❌ AI returned empty response.");
-    }
+    if (!content) return;
 
     if (content.length > 2000) {
       content = content.slice(0, 1990) + "...";
     }
 
-    return message.reply(content);
-
+    return message.reply(content).catch(() => {});
   } catch (err) {
     console.error("Reply Error:", err);
   }
 }
 
-// ================= GEMINI AI FUNCTION =================
+// ================= GEMINI =================
 async function askAI(prompt, userMessage) {
   try {
     const res = await ai.chat.completions.create({
-      model: "gemini-2.0-flash",
+      model: "gemini-1.5-flash",
       messages: [
         {
           role: "system",
-          content: `${prompt}
-
-Rules:
-- Keep responses short
-- Be helpful
-- Stay in character`
+          content: `${prompt}\n\nRules:\n- short replies\n- helpful`
         },
         {
           role: "user",
@@ -108,10 +95,10 @@ Rules:
       ]
     });
 
-    return res.choices?.[0]?.message?.content || "❌ No response from AI.";
+    return res.choices?.[0]?.message?.content || "❌ No response.";
 
   } catch (err) {
-    console.error(err);
+    console.error("🔥 GEMINI ERROR:", err?.message || err);
     return "❌ AI error occurred.";
   }
-        }
+}
