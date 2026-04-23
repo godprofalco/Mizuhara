@@ -1,4 +1,7 @@
-const { Events, EmbedBuilder } = require('discord.js');
+const { Events } = require('discord.js');
+
+// 🌍 GLOBAL PROMPT (fallback brain)
+const GLOBAL_PROMPT = "You are a helpful AI assistant.";
 
 module.exports = {
   name: Events.MessageCreate,
@@ -6,46 +9,55 @@ module.exports = {
 
   async execute(message) {
     if (message.author.bot) return;
-    if (!message.guild) return;
 
     const client = message.client;
 
-    // 🔥 Check mention
-    const isMentioned = message.mentions.has(client.user);
-    if (!isMentioned) return;
+    // ================= INIT STORAGE SAFETY =================
+    if (!client.guildPrompts) client.guildPrompts = new Map();
+    if (!client.activeChannels) client.activeChannels = new Map();
 
     try {
-      let helpCommandId = 'unknown';
 
-      // ⚠️ safer fetch (only if API ready)
-      if (client.application?.commands) {
-        const commands = await client.application.commands.fetch();
-        const helpCommand = commands.find(cmd => cmd.name === 'help');
-        if (helpCommand) helpCommandId = helpCommand.id;
+      // ================= DM MODE =================
+      if (!message.guild) {
+
+        const reply = generateAIResponse(
+          GLOBAL_PROMPT,
+          message.content
+        );
+
+        return message.reply(reply);
       }
 
-      const userMessage = message.content
-        .replace(new RegExp(`<@!?${client.user.id}>`, 'g'), '')
-        .trim();
+      // ================= SERVER MODE =================
+      const guildId = message.guild.id;
+      const activeChannel = client.activeChannels.get(guildId);
 
-      const mentionEmbed = new EmbedBuilder()
-        .setColor(0x5865f2)
-        .setDescription(
-          `👋 Hey ${message.author}, I'm Mizuhara, I use \`/\` commands.\n\n` +
-          `💡 You said: **${userMessage || "hello"}**\n\n` +
-          `📌 Type </help:${helpCommandId}> to see commands.\n` +
-          `⭐ Mention @godpro_falco for details.`
-        )
-        .setTimestamp();
+      // ❌ If no active channel → bot stays silent
+      if (!activeChannel) return;
 
-      return message.reply({ embeds: [mentionEmbed] });
+      // ❌ If not in active channel → ignore everything
+      if (message.channel.id !== activeChannel) return;
+
+      // ================= GET PROMPT =================
+      const serverPrompt =
+        client.guildPrompts.get(guildId) || GLOBAL_PROMPT;
+
+      // ================= AI RESPONSE =================
+      const reply = generateAIResponse(
+        serverPrompt,
+        message.content
+      );
+
+      return message.reply(reply);
 
     } catch (error) {
-      console.error('Mention handler error:', error);
-
-      return message.reply({
-        content: `👋 Hey ${message.author}, I'm online! Use /help.`
-      });
+      console.error("AI Message Error:", error);
     }
   },
 };
+
+// ================= FAKE AI FUNCTION (REPLACE WITH API LATER) =================
+function generateAIResponse(prompt, message) {
+  return `🤖 (${prompt})\n\nYou said: ${message}`;
+}
