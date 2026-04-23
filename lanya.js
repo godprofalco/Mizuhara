@@ -1,3 +1,5 @@
+require('dotenv').config();
+
 const express = require('express');
 const app = express();
 
@@ -5,11 +7,10 @@ app.get('/', (req, res) => {
   res.send('Everything is up!');
 });
 
-app.listen(10000, () => {
-  console.log('✅ Express server running on port 10000');
+const PORT = process.env.PORT || 10000;
+app.listen(PORT, () => {
+  console.log('✅ Express server running on port', PORT);
 });
-
-require('dotenv').config();
 
 const {
   Client,
@@ -66,7 +67,7 @@ client.lavalink = new LavalinkManager({
   },
 });
 
-// ================= STYLES (FIXED CRASH HERE) =================
+// ================= STYLES =================
 
 global.styles = {
   successColor: chalk.bold.green,
@@ -126,7 +127,6 @@ client.on('interactionCreate', async (interaction) => {
     if (!interaction.isChatInputCommand()) return;
 
     const command = client.commands.get(interaction.commandName);
-
     if (!command) return;
 
     await command.execute(interaction, client);
