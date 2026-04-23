@@ -3,6 +3,8 @@ const { SlashCommandBuilder, PermissionsBitField } = require('discord.js');
 const OWNER_ID = "969181284784025670";
 
 function isAuthorized(interaction) {
+  if (!interaction.guild) return false;
+
   const isOwner = interaction.guild.ownerId === interaction.user.id;
   const isBotOwner = interaction.user.id === OWNER_ID;
   const isAdmin = interaction.member.permissions.has(PermissionsBitField.Flags.Administrator);
@@ -38,8 +40,17 @@ module.exports = {
     if (!client.guildPrompts) client.guildPrompts = new Map();
 
     const sub = interaction.options.getSubcommand();
+
+    if (!interaction.guild) {
+      return interaction.reply({
+        content: "❌ This command only works in servers.",
+        ephemeral: true
+      });
+    }
+
     const guildId = interaction.guild.id;
 
+    // ================= SET =================
     if (sub === 'set') {
 
       if (!isAuthorized(interaction)) {
@@ -50,9 +61,13 @@ module.exports = {
 
       client.guildPrompts.set(guildId, text);
 
-      return interaction.reply({ content: "🧠 Prompt updated.", ephemeral: true });
+      return interaction.reply({
+        content: "🧠 Prompt updated.",
+        ephemeral: true
+      });
     }
 
+    // ================= VIEW =================
     if (sub === 'view') {
       const prompt = client.guildPrompts.get(guildId);
 
@@ -62,6 +77,7 @@ module.exports = {
       });
     }
 
+    // ================= RESET =================
     if (sub === 'reset') {
 
       if (!isAuthorized(interaction)) {
