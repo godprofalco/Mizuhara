@@ -4,11 +4,11 @@ const { GoogleGenerativeAI } = require('@google/generative-ai');
 // 🌍 GLOBAL PROMPT
 const GLOBAL_PROMPT = "You are a helpful assistant.";
 
-// 🤖 GEMINI CLIENT
+// 🤖 GEMINI CLIENT (FIXED MODEL)
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
 const model = genAI.getGenerativeModel({
-  model: "gemini-1.5-flash"
+  model: "gemini-1.5-flash-latest"
 });
 
 // ================= COOLDOWN =================
@@ -87,10 +87,13 @@ async function askAI(prompt, userMessage) {
     );
 
     const response = await result.response;
-    return response.text() || "❌ No response.";
+
+    if (!response || !response.text) return "❌ No response.";
+
+    return response.text();
 
   } catch (err) {
     console.error("🔥 GEMINI ERROR:", err);
     return "❌ AI error occurred.";
   }
-  }
+}
