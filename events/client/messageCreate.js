@@ -1,13 +1,14 @@
 const { Events } = require('discord.js');
-const OpenAI = require('openai');
+const { GoogleGenerativeAI } = require('@google/generative-ai');
 
 // 🌍 GLOBAL PROMPT
 const GLOBAL_PROMPT = "You are a helpful assistant.";
 
 // 🤖 GEMINI CLIENT
-const ai = new OpenAI({
-  apiKey: process.env.GEMINI_API_KEY,
-  baseURL: "https://generativelanguage.googleapis.com/v1beta/openai/"
+const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+
+const model = genAI.getGenerativeModel({
+  model: "gemini-1.5-flash"
 });
 
 // ================= COOLDOWN =================
@@ -35,7 +36,6 @@ module.exports = {
     if (!client.activeChannels) client.activeChannels = new Map();
 
     try {
-
       if (isRateLimited(message.author.id)) return;
 
       // ================= DM MODE =================
@@ -66,13 +66,14 @@ module.exports = {
 // ================= SAFE REPLY =================
 async function safeReply(message, content) {
   try {
-    if (!content) return;
+    if (!content || typeof content !== "string") return;
 
-    if (content.length > 2000) {
-      content = content.slice(0, 1990) + "...";
-    }
+    const finalContent =
+      content.length > 2000
+        ? content.slice(0, 1990) + "..."
+        : content;
 
-    return message.reply(content).catch(() => {});
+    return message.reply(finalContent).catch(() => {});
   } catch (err) {
     console.error("Reply Error:", err);
   }
@@ -81,24 +82,15 @@ async function safeReply(message, content) {
 // ================= GEMINI =================
 async function askAI(prompt, userMessage) {
   try {
-    const res = await ai.chat.completions.create({
-      model: "gemini-1.5-flash",
-      messages: [
-        {
-          role: "system",
-          content: `${prompt}\n\nRules:\n- short replies\n- helpful`
-        },
-        {
-          role: "user",
-          content: userMessage
-        }
-      ]
-    });
+    const result = await model.generateContent(
+      `${prompt}\n\nUser: ${userMessage}`
+    );
 
-    return res.choices?.[0]?.message?.content || "❌ No response.";
+    const response = await result.response;
+    return response.text() || "❌ No response.";
 
   } catch (err) {
-    console.error("🔥 GEMINI ERROR:", err?.message || err);
+    console.error("🔥 GEMINI ERROR:", err);
     return "❌ AI error occurred.";
   }
-}
+  }
