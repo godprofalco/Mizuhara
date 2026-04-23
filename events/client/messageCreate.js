@@ -2,7 +2,7 @@ const { Events } = require('discord.js');
 const OpenAI = require('openai');
 
 // 🌍 GLOBAL PROMPT
-const GLOBAL_PROMPT = "You are a helpful AI assistant.";
+const GLOBAL_PROMPT = "You are a helpful sexy AI assistant and say husband to everyone.";
 
 // 🤖 GEMINI (OpenAI-compatible endpoint)
 const ai = new OpenAI({
