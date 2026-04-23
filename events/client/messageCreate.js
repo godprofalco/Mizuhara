@@ -1,7 +1,7 @@
 const { Events } = require('discord.js');
 const OpenAI = require('openai');
 
-// 🌍 GLOBAL PROMPT (fallback brain)
+// 🌍 GLOBAL PROMPT
 const GLOBAL_PROMPT = "You are a helpful AI assistant.";
 
 const openai = new OpenAI({
@@ -17,7 +17,7 @@ module.exports = {
 
     const client = message.client;
 
-    // ================= INIT STORAGE SAFETY =================
+    // ================= INIT MAPS =================
     if (!client.guildPrompts) client.guildPrompts = new Map();
     if (!client.activeChannels) client.activeChannels = new Map();
 
@@ -25,71 +25,60 @@ module.exports = {
 
       // ================= DM MODE =================
       if (!message.guild) {
-        const reply = await generateAIResponse(
-          GLOBAL_PROMPT,
-          message.content
-        );
-
+        const reply = await askAI(GLOBAL_PROMPT, message.content);
         return message.reply(reply);
       }
 
       // ================= SERVER MODE =================
       const guildId = message.guild.id;
+
       const activeChannel = client.activeChannels.get(guildId);
 
-      // ❌ Bot disabled if no active channel
+      // ❌ bot OFF if no active channel
       if (!activeChannel) return;
 
-      // ❌ Ignore other channels
+      // ❌ ignore other channels
       if (message.channel.id !== activeChannel) return;
 
-      // ================= PROMPT SYSTEM =================
-      const serverPrompt =
+      const prompt =
         client.guildPrompts.get(guildId) || GLOBAL_PROMPT;
 
-      // ================= AI RESPONSE =================
-      const reply = await generateAIResponse(
-        serverPrompt,
-        message.content
-      );
+      const reply = await askAI(prompt, message.content);
 
       return message.reply(reply);
 
-    } catch (error) {
-      console.error("AI Message Error:", error);
+    } catch (err) {
+      console.error("AI Error:", err);
     }
-  },
+  }
 };
 
 // ================= OPENAI FUNCTION =================
-async function generateAIResponse(prompt, message) {
-
+async function askAI(prompt, userMessage) {
   try {
-    const response = await openai.chat.completions.create({
+    const res = await openai.chat.completions.create({
       model: "gpt-4o-mini",
       messages: [
         {
           role: "system",
-          content: `
-${prompt}
+          content: `${prompt}
 
 Rules:
-- Keep replies short (max 5 sentences)
-- Be helpful and natural
-- Stay in character
-          `
+- Keep responses short
+- Be helpful
+- Stay in character`
         },
         {
           role: "user",
-          content: message
+          content: userMessage
         }
       ]
     });
 
-    return response.choices[0].message.content;
+    return res.choices[0].message.content;
 
   } catch (err) {
-    console.error("OpenAI Error:", err);
-    return "❌ AI is currently unavailable.";
+    console.error(err);
+    return "❌ AI error occurred.";
   }
 }
