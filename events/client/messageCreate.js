@@ -1,7 +1,12 @@
 const { Events } = require('discord.js');
+const OpenAI = require('openai');
 
 // 🌍 GLOBAL PROMPT (fallback brain)
 const GLOBAL_PROMPT = "You are a helpful AI assistant.";
+
+const openai = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY
+});
 
 module.exports = {
   name: Events.MessageCreate,
@@ -20,8 +25,7 @@ module.exports = {
 
       // ================= DM MODE =================
       if (!message.guild) {
-
-        const reply = generateAIResponse(
+        const reply = await generateAIResponse(
           GLOBAL_PROMPT,
           message.content
         );
@@ -33,18 +37,18 @@ module.exports = {
       const guildId = message.guild.id;
       const activeChannel = client.activeChannels.get(guildId);
 
-      // ❌ If no active channel → bot stays silent
+      // ❌ Bot disabled if no active channel
       if (!activeChannel) return;
 
-      // ❌ If not in active channel → ignore everything
+      // ❌ Ignore other channels
       if (message.channel.id !== activeChannel) return;
 
-      // ================= GET PROMPT =================
+      // ================= PROMPT SYSTEM =================
       const serverPrompt =
         client.guildPrompts.get(guildId) || GLOBAL_PROMPT;
 
       // ================= AI RESPONSE =================
-      const reply = generateAIResponse(
+      const reply = await generateAIResponse(
         serverPrompt,
         message.content
       );
@@ -57,7 +61,35 @@ module.exports = {
   },
 };
 
-// ================= FAKE AI FUNCTION (REPLACE WITH API LATER) =================
-function generateAIResponse(prompt, message) {
-  return `🤖 (${prompt})\n\nYou said: ${message}`;
+// ================= OPENAI FUNCTION =================
+async function generateAIResponse(prompt, message) {
+
+  try {
+    const response = await openai.chat.completions.create({
+      model: "gpt-4o-mini",
+      messages: [
+        {
+          role: "system",
+          content: `
+${prompt}
+
+Rules:
+- Keep replies short (max 5 sentences)
+- Be helpful and natural
+- Stay in character
+          `
+        },
+        {
+          role: "user",
+          content: message
+        }
+      ]
+    });
+
+    return response.choices[0].message.content;
+
+  } catch (err) {
+    console.error("OpenAI Error:", err);
+    return "❌ AI is currently unavailable.";
+  }
 }
