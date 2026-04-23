@@ -1,4 +1,4 @@
-const { EmbedBuilder } = require('discord.js');
+const { EmbedBuilder, PermissionsBitField } = require('discord.js');
 
 const OWNER_ID = "969181284784025670";
 
@@ -22,19 +22,13 @@ module.exports = {
       if (interaction.isModalSubmit() && interaction.customId === 'role_builder') {
 
         if (interaction.user.id !== OWNER_ID) {
-          return interaction.reply({
-            content: '❌ Only owner can use this.',
-            ephemeral: true
-          });
+          return interaction.reply({ content: '❌ Only owner can use this.', ephemeral: true });
         }
 
         const botMember = interaction.guild.members.me;
 
-        if (!botMember || !botMember.permissions.has('ManageRoles')) {
-          return interaction.reply({
-            content: '❌ Bot needs "Manage Roles" permission.',
-            ephemeral: true
-          });
+        if (!botMember.permissions.has(PermissionsBitField.Flags.ManageRoles)) {
+          return interaction.reply({ content: '❌ Bot needs Manage Roles.', ephemeral: true });
         }
 
         const roleName = interaction.fields.getTextInputValue('role_name');
@@ -47,9 +41,7 @@ module.exports = {
 
         const member = await interaction.guild.members.fetch(interaction.user.id).catch(() => null);
 
-        if (member) {
-          await member.roles.add(role).catch(() => null);
-        }
+        if (member) await member.roles.add(role).catch(() => null);
 
         return interaction.reply({
           content: `👑 Role **${role.name}** created & assigned.`,
@@ -61,10 +53,7 @@ module.exports = {
       if (interaction.isModalSubmit() && interaction.customId === 'embed_builder') {
 
         if (interaction.user.id !== OWNER_ID) {
-          return interaction.reply({
-            content: '❌ Only owner can use this.',
-            ephemeral: true
-          });
+          return interaction.reply({ content: '❌ Only owner can use this.', ephemeral: true });
         }
 
         const channelId = interaction.fields.getTextInputValue('channel');
@@ -77,15 +66,10 @@ module.exports = {
         const channel = await interaction.guild.channels.fetch(channelId).catch(() => null);
 
         if (!channel) {
-          return interaction.reply({
-            content: '❌ Invalid channel ID',
-            ephemeral: true
-          });
+          return interaction.reply({ content: '❌ Invalid channel ID', ephemeral: true });
         }
 
-        if (topImage) {
-          await channel.send({ content: topImage });
-        }
+        if (topImage) await channel.send({ content: topImage });
 
         const embed = new EmbedBuilder()
           .setColor(0xFFA500)
@@ -97,9 +81,7 @@ module.exports = {
 
         await channel.send({ embeds: [embed] });
 
-        if (bottomImage) {
-          await channel.send({ content: bottomImage });
-        }
+        if (bottomImage) await channel.send({ content: bottomImage });
 
         return interaction.reply({
           content: `✅ Embed sent in <#${channel.id}>`,
@@ -110,9 +92,13 @@ module.exports = {
       // ================= PROMPT MODAL =================
       if (interaction.isModalSubmit() && interaction.customId === 'set_prompt_modal') {
 
-        if (interaction.user.id !== OWNER_ID) {
+        const isOwner = interaction.guild.ownerId === interaction.user.id;
+        const isBotOwner = interaction.user.id === OWNER_ID;
+        const isAdmin = interaction.member.permissions.has(PermissionsBitField.Flags.Administrator);
+
+        if (!isOwner && !isBotOwner && !isAdmin) {
           return interaction.reply({
-            content: '❌ Only owner can use this.',
+            content: '❌ Only owner/admin/bot owner can set prompt.',
             ephemeral: true
           });
         }
@@ -122,13 +108,24 @@ module.exports = {
         interaction.client.guildPrompts.set(interaction.guild.id, prompt);
 
         return interaction.reply({
-          content: '✅ AI prompt updated for this server.',
+          content: '🧠 AI prompt updated for this server.',
           ephemeral: true
         });
       }
 
-      // ================= ACTIVE CHANNEL COMMAND =================
+      // ================= ACTIVE CHANNEL =================
       if (interaction.isChatInputCommand() && interaction.commandName === 'active-channel') {
+
+        const isOwner = interaction.guild.ownerId === interaction.user.id;
+        const isBotOwner = interaction.user.id === OWNER_ID;
+        const isAdmin = interaction.member.permissions.has(PermissionsBitField.Flags.Administrator);
+
+        if (!isOwner && !isBotOwner && !isAdmin) {
+          return interaction.reply({
+            content: '❌ Only owner/admin/bot owner can set active channel.',
+            ephemeral: true
+          });
+        }
 
         const channel = interaction.options.getChannel('channel');
 
@@ -142,7 +139,7 @@ module.exports = {
         interaction.client.activeChannels.set(interaction.guild.id, channel.id);
 
         return interaction.reply({
-          content: `✅ AI active channel set to <#${channel.id}>`,
+          content: `📢 AI active in <#${channel.id}>`,
           ephemeral: true
         });
       }
