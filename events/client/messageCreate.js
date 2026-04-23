@@ -4,8 +4,10 @@ const OpenAI = require('openai');
 // 🌍 GLOBAL PROMPT
 const GLOBAL_PROMPT = "You are a helpful AI assistant.";
 
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY
+// 🤖 GEMINI (OpenAI-compatible endpoint)
+const ai = new OpenAI({
+  apiKey: process.env.GEMINI_API_KEY,
+  baseURL: "https://generativelanguage.googleapis.com/v1beta/openai/"
 });
 
 module.exports = {
@@ -34,10 +36,8 @@ module.exports = {
 
       const activeChannel = client.activeChannels.get(guildId);
 
-      // ❌ bot OFF if no active channel
       if (!activeChannel) return;
 
-      // ❌ ignore other channels
       if (message.channel.id !== activeChannel) return;
 
       const prompt =
@@ -53,11 +53,11 @@ module.exports = {
   }
 };
 
-// ================= OPENAI FUNCTION =================
+// ================= GEMINI AI FUNCTION =================
 async function askAI(prompt, userMessage) {
   try {
-    const res = await openai.chat.completions.create({
-      model: "gpt-4o-mini",
+    const res = await ai.chat.completions.create({
+      model: "gemini-2.0-flash",
       messages: [
         {
           role: "system",
