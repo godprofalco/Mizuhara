@@ -1,88 +1,82 @@
-const GuildAI = require('../../models/GuildAI');
+const { SlashCommandBuilder, PermissionsBitField } = require('discord.js');
+
+const OWNER_ID = "969181284784025670";
 
 function isAuthorized(interaction) {
   const isOwner = interaction.guild.ownerId === interaction.user.id;
-  const isBotOwner = interaction.user.id === process.env.BOT_OWNER_ID;
-  const isAdmin = interaction.member.permissions.has("Administrator");
+  const isBotOwner = interaction.user.id === OWNER_ID;
+  const isAdmin = interaction.member.permissions.has(PermissionsBitField.Flags.Administrator);
 
   return isOwner || isBotOwner || isAdmin;
 }
 
 module.exports = {
-  name: 'active-channel',
-  description: 'Manage AI active channel',
-  options: [
-    {
-      name: 'set',
-      type: 1, // SUB_COMMAND
-      description: 'Set active channel',
-      options: [
-        {
-          name: 'channel',
-          type: 7, // CHANNEL
-          required: true,
-          description: 'Select channel'
-        }
-      ]
-    },
-    {
-      name: 'remove',
-      type: 1,
-      description: 'Disable AI in this server'
-    },
-    {
-      name: 'view',
-      type: 1,
-      description: 'View active channel'
-    }
-  ],
+  data: new SlashCommandBuilder()
+    .setName('active-channel')
+    .setDescription('Manage AI active channel')
+    .addSubcommand(sub =>
+      sub.setName('set')
+        .setDescription('Set active channel')
+        .addChannelOption(opt =>
+          opt.setName('channel')
+            .setDescription('Channel')
+            .setRequired(true)
+        )
+    )
+    .addSubcommand(sub =>
+      sub.setName('remove')
+        .setDescription('Disable AI')
+    )
+    .addSubcommand(sub =>
+      sub.setName('view')
+        .setDescription('View active channel')
+    ),
 
-  execute: async (interaction) => {
+  async execute(interaction) {
+
+    const client = interaction.client;
+    if (!client.activeChannels) client.activeChannels = new Map();
+
     const sub = interaction.options.getSubcommand();
+    const guildId = interaction.guild.id;
 
     if (sub === 'set') {
+
       if (!isAuthorized(interaction)) {
-        return interaction.reply({
-          content: "❌ Only owner/admin/bot owner can set active channel.",
-          ephemeral: true
-        });
+        return interaction.reply({ content: "❌ No permission", ephemeral: true });
       }
 
       const channel = interaction.options.getChannel('channel');
 
-      await GuildAI.findOneAndUpdate(
-        { guildId: interaction.guild.id },
-        { activeChannel: channel.id },
-        { upsert: true }
-      );
+      client.activeChannels.set(guildId, channel.id);
 
-      return interaction.reply(`✅ AI activated in ${channel}`);
+      return interaction.reply({
+        content: `📢 Active in ${channel}`,
+        ephemeral: true
+      });
     }
 
     if (sub === 'remove') {
+
       if (!isAuthorized(interaction)) {
-        return interaction.reply({
-          content: "❌ Only owner/admin/bot owner can disable AI.",
-          ephemeral: true
-        });
+        return interaction.reply({ content: "❌ No permission", ephemeral: true });
       }
 
-      await GuildAI.findOneAndUpdate(
-        { guildId: interaction.guild.id },
-        { activeChannel: null }
-      );
+      client.activeChannels.delete(guildId);
 
-      return interaction.reply("🚫 AI disabled in this server.");
+      return interaction.reply({
+        content: "🚫 AI disabled",
+        ephemeral: true
+      });
     }
 
     if (sub === 'view') {
-      const data = await GuildAI.findOne({ guildId: interaction.guild.id });
+      const channelId = client.activeChannels.get(guildId);
 
-      if (!data || !data.activeChannel) {
-        return interaction.reply("ℹ️ No active channel set. AI is OFF.");
-      }
-
-      return interaction.reply(`📢 Active Channel: <#${data.activeChannel}>`);
+      return interaction.reply({
+        content: channelId ? `<#${channelId}>` : "No active channel",
+        ephemeral: true
+      });
     }
   }
 };
